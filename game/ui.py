@@ -365,10 +365,11 @@ class TicketShopPopup(PopupMenu):
                 self.width - 40, 50,
                 text, color=color, font_size=24
             )
+            btn.base_y = y_pos
             btn.set_enabled(is_unlocked)
             self.ticket_buttons[key] = btn
             y_pos += 60
-            self.content_height = len(self.ticket_buttons) * 60  # buttons are 60 pixels tall
+            self.content_height = len(self.ticket_buttons) * 65  # buttons are 60 pixels tall
             self.max_scroll = max(0, self.content_height - self.scroll_area_height)
 
     def update(self, mouse_pos, mouse_clicked, player, ticket_types):
@@ -383,10 +384,10 @@ class TicketShopPopup(PopupMenu):
         bought = None
 
         for key, btn in self.ticket_buttons.items():
-            is_unlocked = key in unlocked
+            is_unlocked = key in unlocked # Check if unlocked
             config = ticket_types[key]
             can_afford = player.can_afford(config["cost"])
-
+            # Enable button if ticket unlocked and can afford
             btn.set_enabled(is_unlocked and can_afford)
 
             # Update button text to show locked status
@@ -409,13 +410,26 @@ class TicketShopPopup(PopupMenu):
         self.draw_base(screen)
 
         # Draw subtitle
+        clip_rect = pygame.Rect(
+            self.x,
+            self.scroll_area_top,
+            self.width,
+            self.scroll_area_height
+        )
+        screen.set_clip(clip_rect)
+        # Draw buttons
+        for btn in self.ticket_buttons.values():
+            btn.rect.y = btn.base_y - self.scroll_offset
+            btn.draw(screen)
+        screen.set_clip(None)
+        self.draw_scrollbar(screen)
+
         subtitle_font = pygame.font.Font(None, 24)
         subtitle = subtitle_font.render("Click a ticket to buy it!", True, (200, 255, 200))
         screen.blit(subtitle, (self.x + 20, self.y + 50))
 
-        # Draw buttons
-        for btn in self.ticket_buttons.values():
-            btn.draw(screen)
+
+
 
 
 class UpgradeShopPopup(PopupMenu):

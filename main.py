@@ -65,7 +65,7 @@ class Game:
 
         # Create background
         self.background = self._create_background()
-
+        # Debug variable
     def _create_background(self):
         """Create the gas station counter background."""
         bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -335,13 +335,15 @@ class Game:
         """Main game loop."""
         while self.running:
             dt = self.clock.tick(FPS) / 1000.0
-
+            #Control Handler
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.MOUSEWHEEL:
                     if self.upgrade_shop.is_in_scroll_area(pygame.mouse.get_pos()):
                         self.upgrade_shop.handle_scroll(event.y)
+                    if self.ticket_shop.is_in_scroll_area(pygame.mouse.get_pos()):
+                        self.ticket_shop.handle_scroll(event.y)
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
@@ -362,9 +364,10 @@ class Game:
                         self.ticket_shop.setup_buttons(TICKET_TYPES, self.player.get_unlocked_tickets())
                         self.upgrade_shop.setup_buttons(UPGRADES, self.player)
                         self.messages.add_message("Game Reset!", (255, 100, 100))
+
                     elif event.key == pygame.K_d:
                         print("D")
-                        self.player.morale -= 10
+
 
             self.update(dt)
             self.draw()

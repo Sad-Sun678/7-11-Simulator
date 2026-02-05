@@ -1,14 +1,17 @@
 {
-  "money": 9566.0,
-  "total_earned": 10606.0,
-  "total_spent": 1045.0,
-  "tickets_scratched": 181,
+  "money": 14026.0,
+  "total_earned": 17474.0,
+  "total_spent": 3453.0,
+  "tickets_scratched": 210,
   "biggest_win": 1000,
   "upgrades": {
     "lucky_charm": 3,
-    "scratch_speed": 3,
+    "scratch_speed": 4,
     "auto_scratcher": 2,
-    "auto_collect": 1,
-    "bulk_buy": 0
+    "auto_collect": 5,
+    "bulk_buy": 0,
+    "lucky_charm1": 0,
+    "lucky_charm2": 0,
+    "lucky_charm3": 0
   }
 }

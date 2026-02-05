@@ -43,6 +43,30 @@ UPGRADES = {
         "max_level": 5,
         "icon": "",
     },
+    "lucky_charm1": {
+        "name": "Lucky Charm",
+        "description": "Increases win chance",
+        "base_cost": 25,
+        "cost_multiplier": 1.8,
+        "max_level": 10,
+        "icon": "",
+    },
+    "lucky_charm2": {
+        "name": "Lucky Charm",
+        "description": "Increases win chance",
+        "base_cost": 25,
+        "cost_multiplier": 1.8,
+        "max_level": 10,
+        "icon": "",
+    },
+    "lucky_charm3": {
+        "name": "Lucky Charm",
+        "description": "Increases win chance",
+        "base_cost": 25,
+        "cost_multiplier": 1.8,
+        "max_level": 10,
+        "icon": "",
+    },
 }
 
 
@@ -148,7 +172,7 @@ class Player:
     def gain_morale(self,amount):
         print(self.morale)
         if self.morale + amount > self.morale_cap:
-            return
+            self.morale = self.morale_cap
         else:
             self.morale += amount
     def scratch_ticket(self):
