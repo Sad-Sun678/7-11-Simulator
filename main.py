@@ -1,18 +1,19 @@
 import pygame
 import sys
 import random
+import math
 
 from game.ticket import ScratchTicket, TICKET_TYPES, create_ticket
 from game.player import Player, UPGRADES
 from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
-                     MainMenuButtons, AutoCollectTimer,HealthBar)
+                     MainMenuButtons, AutoCollectTimer,HealthBar,DrunkEffect)
 from game.particles import ParticleSystem, ScreenShake
 
 # Initialize Pygame
 pygame.init()
 
 # Screen settings
-SCREEN_WIDTH = 1600
+SCREEN_WIDTH = 1800
 SCREEN_HEIGHT = 900
 FPS = 60
 
@@ -52,6 +53,8 @@ class Game:
         # Effects
         self.particles = ParticleSystem()
         self.screen_shake = ScreenShake()
+        # Drunk effect (debug)
+        self.drunk = DrunkEffect()
 
         # State
         self.scratching = False
@@ -274,21 +277,32 @@ class Game:
         self.screen_shake.update(dt)
         self.messages.update(dt)
         self.health_bar.update(self.player.morale)
+        # if drunk on update drunk
+        self.drunk.update(dt)
 
         self.mouse_was_pressed = mouse_pressed
 
     def draw(self):
         """Draw the game."""
         shake_offset = self.screen_shake.get_offset()
+        drunk_offset = self.drunk.get_offset()
 
-        # Draw background
-        self.screen.blit(self.background, shake_offset)
+        final_offset = (
+            shake_offset[0] + drunk_offset[0],
+            shake_offset[1] + drunk_offset[1]
+        )
+
+        self.screen.blit(self.background, final_offset)
 
         # Draw current ticket
         if self.current_ticket:
             orig_x, orig_y = self.current_ticket.x, self.current_ticket.y
-            self.current_ticket.x += shake_offset[0]
-            self.current_ticket.y += shake_offset[1]
+            if self.drunk.enabled:
+                self.current_ticket.x += final_offset[0]
+                self.current_ticket.y += final_offset[1]
+            elif not self.drunk.enabled:
+                self.current_ticket.x += shake_offset[0]
+                self.current_ticket.y += shake_offset[1]
             self.current_ticket.draw(self.screen)
             self.current_ticket.x, self.current_ticket.y = orig_x, orig_y
 
@@ -314,7 +328,7 @@ class Game:
 
         # Draw HUD
         self.hud.draw(self.screen, self.player)
-        # TODO DRAW HEALTHBAR
+        # Draw Health Bar
         self.health_bar.draw(self.screen)
         # Draw main buttons
         self.main_buttons.draw(self.screen)
@@ -366,7 +380,8 @@ class Game:
                         self.messages.add_message("Game Reset!", (255, 100, 100))
 
                     elif event.key == pygame.K_d:
-                        print("D")
+                        # Press D to test things :)
+                        self.drunk.toggle()
 
 
             self.update(dt)

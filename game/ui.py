@@ -1,4 +1,41 @@
 import pygame
+import math
+import random
+
+class DrunkEffect:
+    def __init__(self):
+        self.time = 0.0
+        self.enabled = False
+
+        # Drunk effect settings
+        self.sway_strength_x = 20
+        self.sway_strength_y = 20
+        self.speed = 0.7
+        self.noise = 0.5
+
+    def toggle(self):
+        self.enabled = not self.enabled
+        if not self.enabled:
+            self.time = 0
+
+    def update(self, dt):
+        if not self.enabled:
+            return
+
+        self.time += dt * self.speed
+
+    def get_offset(self):
+        if not self.enabled:
+            return (0, 0)
+
+        x = math.sin(self.time) * self.sway_strength_x
+        y = math.cos(self.time * 0.7) * self.sway_strength_y
+
+        # subtle jitter
+        x += random.uniform(-self.noise, self.noise)
+        y += random.uniform(-self.noise, self.noise)
+
+        return int(x), int(y)
 
 class HealthBar:
     def __init__(self, x, y, width, height, text,
@@ -567,10 +604,10 @@ class MainMenuButtons:
 
         # Collect button (center, but will be positioned dynamically)
         self.collect_btn = Button(
-            screen_width // 2 + 10, btn_y,
-            150, btn_height,
-            "COLLECT",
-            color=(120, 160, 60), hover_color=(160, 200, 80), font_size=28
+            screen_width // 2 - 50  , btn_y,
+            150, btn_height,"COLLECT",
+            color=(120, 160, 60), hover_color=(160, 200, 80),
+            font_size=28
         )
         self.collect_btn.set_enabled(False)
 
