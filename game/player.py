@@ -68,6 +68,23 @@ UPGRADES = {
         "icon": "",
     },
 }
+ITEMS = {"beer":{"name":"Beer",
+                 'description':"Get drunk. Increase morale",
+                 "base_cost":10,
+                 "unlock_level":1}}
+
+class Inventory:
+    def __init__(self):
+        self.all_game_items = ITEMS
+        self.items_in_inventory = {} #item:amount
+        self.setup_inventory()
+    def add_to_inventory(self,item,amount):
+        """Looks up item by key and adds that amount"""
+        self.items_in_inventory[item] += amount
+    def setup_inventory(self):
+        """Loops through every item and sets item amounts to 0 """
+        for key, config in self.all_game_items.items():
+            self.items_in_inventory[config['name'].lower()] = 0
 
 
 class Player:
@@ -79,9 +96,16 @@ class Player:
         self.biggest_win = 0
         self.morale = 100
         self.morale_cap = 100
+        self.player_level = 1
+        self.inventory = Inventory()
+        for key, amount in self.inventory.items_in_inventory.items():
+            print(key)
 
         # Upgrade levels
         self.upgrades = {key: 0 for key in UPGRADES}
+        # Item unlock levels
+        self.item_unlock_requirements = {key: data["unlock_level"] for key, data in ITEMS.items()}
+
 
         # Try to load saved game
         self.save_file = "savegame.json"
@@ -123,6 +147,12 @@ class Player:
         if level >= upgrade["max_level"]:
             return None  # Maxed out
         return int(upgrade["base_cost"] * (upgrade["cost_multiplier"] ** level))
+    def get_item_cost(self,item_key):
+        item = ITEMS[item_key]
+        item_level = self.item_unlock_requirements[item_key]
+        if item_level > self.player_level: # level not high enough
+            return None
+        return int(item["base_cost"])
 
     def can_afford_upgrade(self, upgrade_key):
         """Check if player can afford an upgrade."""
@@ -143,7 +173,17 @@ class Player:
             self.save_game()
             return True
         return False
-
+    def buy_item(self, item_key):
+        cost = self.get_item_cost(item_key)
+        if cost is None:
+            return False
+        if self.money >= cost:
+            self.money -= cost
+            self.total_spent+= cost
+            self.inventory.add_to_inventory(item_key,1)
+            self.save_game()
+            return True
+        return False
     def can_afford(self, amount):
         """Check if player can afford something."""
         return self.money >= amount

@@ -4,9 +4,9 @@ import random
 import math
 
 from game.ticket import ScratchTicket, TICKET_TYPES, create_ticket
-from game.player import Player, UPGRADES
+from game.player import Player, UPGRADES, ITEMS
 from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
-                     MainMenuButtons, AutoCollectTimer,HealthBar,DrunkEffect)
+                     MainMenuButtons, AutoCollectTimer,HealthBar,DrunkEffect,ItemShopPopup)
 from game.particles import ParticleSystem, ScreenShake
 
 # Initialize Pygame
@@ -41,6 +41,8 @@ class Game:
         self.upgrade_shop = UpgradeShopPopup(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.upgrade_shop.setup_buttons(UPGRADES, self.player)
 
+        self.item_shop = ItemShopPopup(SCREEN_WIDTH, SCREEN_HEIGHT)
+
         # Main screen buttons
         self.main_buttons = MainMenuButtons(SCREEN_WIDTH, SCREEN_HEIGHT)
 
@@ -69,26 +71,36 @@ class Game:
         # Create background
         self.background = self._create_background()
         # Debug variable
+
     def _create_background(self):
-        """Create the gas station counter background."""
+        """Create static background and separate scratching mat."""
         bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         bg.fill(BG_COLOR)
 
-        # Main counter area (where tickets go)
+        # Main counter area (STATIC)
         counter_rect = pygame.Rect(50, 80, SCREEN_WIDTH - 100, SCREEN_HEIGHT - 180)
         pygame.draw.rect(bg, COUNTER_COLOR, counter_rect, border_radius=20)
         pygame.draw.rect(bg, (75, 80, 90), counter_rect, 4, border_radius=20)
 
-        # Scratching mat area
-        mat_rect = pygame.Rect(100, 120, SCREEN_WIDTH - 300, SCREEN_HEIGHT - 280)
-        pygame.draw.rect(bg, (45, 50, 60), mat_rect, border_radius=15)
-        pygame.draw.rect(bg, (65, 70, 80), mat_rect, 2, border_radius=15)
 
-        # "Scratch here" text when no ticket
+        # Create SCRATCH MAT as separate surface
+        mat_w = SCREEN_WIDTH - 300
+        mat_h = SCREEN_HEIGHT - 280
+
+        mat = pygame.Surface((mat_w, mat_h), pygame.SRCALPHA)
+
+        pygame.draw.rect(mat, (45, 50, 60), mat.get_rect(), border_radius=15)
+        pygame.draw.rect(mat, (65, 70, 80), mat.get_rect(), 2, border_radius=15)
+        # "Scratch here" text
         font = pygame.font.Font(None, 32)
         hint_text = font.render("Buy a ticket to start!", True, (80, 85, 95))
-        bg.blit(hint_text, (SCREEN_WIDTH // 2 - hint_text.get_width() // 2,
-                           SCREEN_HEIGHT // 2 - hint_text.get_height() // 2))
+        # Add text to mat
+        mat.blit(hint_text, (
+            mat_w // 2 - hint_text.get_width()//2,
+            mat_h// 2
+        ))
+        self.mat_surface = mat
+        self.mat_pos = (100, 120)
 
         return bg
 
@@ -116,10 +128,25 @@ class Game:
         return False
 
     def handle_scratch(self, mouse_pos):
-        """Handle scratching the current ticket."""
         if self.current_ticket and not self.current_ticket.is_complete():
             radius = self.player.get_scratch_radius()
-            result = self.current_ticket.scratch(mouse_pos[0], mouse_pos[1], radius)
+
+            mx, my = mouse_pos
+
+            # Same offsets used in draw()
+            shake_offset = self.screen_shake.get_offset()
+
+            if self.drunk.enabled:
+                drunk_offset = self.drunk.get_offset()
+                ticket_offset = self.drunk.get_ticket_offset()
+
+                mx -= (shake_offset[0] + drunk_offset[0]) * 0.4 + ticket_offset[0]
+                my -= (shake_offset[1] + drunk_offset[1]) * 0.4 + ticket_offset[1]
+            else:
+                mx -= shake_offset[0]
+                my -= shake_offset[1]
+
+            result = self.current_ticket.scratch(mx, my, radius)
 
             if result:
                 self.particles.add_scratch_particles(
@@ -243,6 +270,13 @@ class Game:
                     self.messages.add_message(f"{upgrade_name} upgraded!", (150, 150, 255))
                     self.upgrade_shop.setup_buttons(UPGRADES, self.player)
 
+        elif self.item_shop.is_open:
+            bought_item = self.item_shop.update(mouse_pos,mouse_clicked,self.player, ITEMS)
+            if bought_item:
+                if self.player.buy_item(bought_item):
+                    item_name = ITEMS[bought_item]['name']
+                    self.messages.add_message(f"{item_name} purchased!",(150, 150, 255))
+                    self.item_shop.setup_buttons(ITEMS,self.player)
         else:
             # No popup open - handle main game
 
@@ -259,6 +293,9 @@ class Game:
             elif button_clicks["upgrades"]:
                 self.upgrade_shop.setup_buttons(UPGRADES, self.player)
                 self.upgrade_shop.open()
+            elif button_clicks["item_shop"]:
+                self.item_shop.setup_buttons(ITEMS, self.player)
+                self.item_shop.open()
             elif button_clicks["collect"]:
                 self.collect_winnings()
 
@@ -292,19 +329,48 @@ class Game:
             shake_offset[1] + drunk_offset[1]
         )
 
-        self.screen.blit(self.background, final_offset)
+        self.screen.blit(self.background, (0, 0))
+        mat_x = self.mat_pos[0] + final_offset[0]
+        mat_y = self.mat_pos[1] + final_offset[1]
+
+        self.drunk.draw_double(self.screen, self.mat_surface, (mat_x, mat_y), "mat")
 
         # Draw current ticket
         if self.current_ticket:
-            orig_x, orig_y = self.current_ticket.x, self.current_ticket.y
+            tx = self.current_ticket.x
+            ty = self.current_ticket.y
+            # Check if drunk
             if self.drunk.enabled:
-                self.current_ticket.x += final_offset[0]
-                self.current_ticket.y += final_offset[1]
-            elif not self.drunk.enabled:
-                self.current_ticket.x += shake_offset[0]
-                self.current_ticket.y += shake_offset[1]
-            self.current_ticket.draw(self.screen)
-            self.current_ticket.x, self.current_ticket.y = orig_x, orig_y
+                ticket_offset = self.drunk.get_ticket_offset()
+                tx += final_offset[0] * 0.8 + ticket_offset[0]
+                ty += final_offset[1] * 0.8 + ticket_offset[1]
+
+            else:
+                tx += shake_offset[0]
+                ty += shake_offset[1]
+
+            # ----- COMPOSITE TICKET -----
+            ticket_surface = pygame.Surface(
+                (self.current_ticket.width, self.current_ticket.height),
+                pygame.SRCALPHA
+            )
+
+            # Draw base
+            ticket_surface.blit(self.current_ticket.base_surface, (0, 0))
+            # Draw scratch ON TOP
+            ticket_surface.blit(self.current_ticket.scratch_surface, (0, 0))
+
+            # Ghost entire ticket as ONE object
+            self.drunk.draw_double(self.screen, ticket_surface, (tx, ty), "ticket")
+
+            # Sharp border
+            pygame.draw.rect(
+                self.screen,
+                (80, 60, 40),
+                (tx - 2, ty - 2, self.current_ticket.width + 4, self.current_ticket.height + 4),
+                4,
+                border_radius=12
+            )
 
             # Show queue count
             if self.ticket_queue:
@@ -339,9 +405,11 @@ class Game:
         # Draw messages
         self.messages.draw(self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
 
+
         # Draw popup menus (on top of everything)
         self.ticket_shop.draw(self.screen)
         self.upgrade_shop.draw(self.screen)
+        self.item_shop.draw(self.screen)
 
         pygame.display.flip()
 

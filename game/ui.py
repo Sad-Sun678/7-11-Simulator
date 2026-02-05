@@ -1,28 +1,56 @@
 import pygame
 import math
 import random
+from collections import deque
+
+
+
 
 class DrunkEffect:
     def __init__(self):
         self.time = 0.0
         self.enabled = False
 
-        # Drunk effect settings
-        self.sway_strength_x = 20
+        # Sway
+        self.sway_strength_x = 50
         self.sway_strength_y = 20
         self.speed = 0.7
         self.noise = 0.5
 
+
+        # Double vision
+        self.ghost_delay = 0.5  # seconds (your request)
+        self._offset_history = deque()  # holds (time, (x,y))
+        self.double_vision_strength = 50 # pixels
+        self.double_vision_alpha = 220 # Transparancy
+        self.ghost_trails = {}
+        self.ghost_cache = {}
+
+        self.smear_count = 3  # how many smear copies
+        self.smear_spacing = 1.2  # how far apart they feel
+
+        self.ghost_lag = 20.0  # higher = slower catch-up
+
     def toggle(self):
         self.enabled = not self.enabled
         if not self.enabled:
-            self.time = 0
+            self.time = 0.0
 
     def update(self, dt):
         if not self.enabled:
+            self._offset_history.clear()
             return
 
         self.time += dt * self.speed
+
+        # record the "camera" offset for delayed ghosting
+        cur_offset = self.get_offset()
+        self._offset_history.append((self.time, cur_offset))
+
+        # drop history older than we need (keep a bit extra)
+        cutoff = self.time - (self.ghost_delay + 0.5)
+        while self._offset_history and self._offset_history[0][0] < cutoff:
+            self._offset_history.popleft()
 
     def get_offset(self):
         if not self.enabled:
@@ -31,11 +59,81 @@ class DrunkEffect:
         x = math.sin(self.time) * self.sway_strength_x
         y = math.cos(self.time * 0.7) * self.sway_strength_y
 
-        # subtle jitter
         x += random.uniform(-self.noise, self.noise)
         y += random.uniform(-self.noise, self.noise)
 
         return int(x), int(y)
+
+    def get_ticket_offset(self):
+        if not self.enabled:
+            return (0, 0)
+
+        t = self.time
+
+        x = math.sin(t * 1.3 + 2.0) * (self.sway_strength_x * 0.4)
+        y = math.cos(t * 1.1 + 1.0) * (self.sway_strength_y * 0.4)
+
+        x += math.sin(t * 2.7) * 4
+        y += math.cos(t * 2.3) * 4
+
+        return int(x), int(y)
+
+    # ---------------- DOUBLE VISION ----------------
+    def draw_double(self, screen, surface, real_offset, key):
+        if not self.enabled:
+            screen.blit(surface, real_offset)
+            return
+
+        if key not in self.ghost_trails:
+            self.ghost_trails[key] = []
+
+        trail = self.ghost_trails[key]
+
+        if not trail:
+            trail.append(real_offset)
+        else:
+            last_x, last_y = trail[0]
+
+            smooth = 0.35  # lower = smoother (0.2–0.4 good)
+
+            smoothed = (
+                last_x + (real_offset[0] - last_x) * smooth,
+                last_y + (real_offset[1] - last_y) * smooth
+            )
+
+            trail.insert(0, smoothed)
+        if len(trail) > self.smear_count + 1:
+            trail.pop()
+
+        # Build ghost cache ONCE per surface
+        if key not in self.ghost_cache:
+            ghost = surface.copy().convert_alpha()
+            ghost.fill((200, 200, 200), special_flags=pygame.BLEND_RGB_MULT)
+            self.ghost_cache[key] = ghost
+
+        ghost_surface = self.ghost_cache[key]
+
+        # Draw smear
+        for i in range(len(trail) - 1, 0, -1):
+            t = i / len(trail)
+            alpha = int(self.double_vision_alpha * (1 - t))
+
+            bx = math.sin(self.time * 1.6 + i) * 2
+            by = math.cos(self.time * 1.3 + i) * 2
+
+            ghost_surface.set_alpha(alpha)
+
+            spread = 1 + i * 0.6  # ← trail spacing strength
+            screen.blit(
+                ghost_surface,
+                (
+                    real_offset[0] + (trail[i][0] - real_offset[0]) * spread + bx,
+                    real_offset[1] + (trail[i][1] - real_offset[1]) * spread + by
+                )
+            )
+
+        screen.blit(surface, real_offset)
+
 
 class HealthBar:
     def __init__(self, x, y, width, height, text,
@@ -569,6 +667,98 @@ class UpgradeShopPopup(PopupMenu):
 
         # Draw scrollbar on top
         self.draw_scrollbar(screen)
+class ItemShopPopup(PopupMenu):
+    def __init__(self, screen_width, screen_height):
+        super().__init__(
+            screen_width, screen_height,
+            550, 450,
+            "Consumables",
+            (40, 40, 60), (80, 80, 140)
+        )
+        self.item_buttons = {}
+
+        self.item_descriptions = {}
+    def setup_buttons(self,consumable_items,player):
+        self.item_buttons = {}
+        self.item_descriptions = {}
+
+        y_pos = self.y + 70
+        for key, config in consumable_items.items():
+            cost = player.get_item_cost(key)
+            level = player.inventory.items_in_inventory[key]
+
+            if cost is None:
+                text = f"{config['name']} - Level not high enough"
+            else:
+                text = f"{config['name']} (Amount Owned:{player.inventory.items_in_inventory[key]}) - ${cost}"
+
+                btn =Button(
+                    self.x + 20, y_pos,
+                    self.width - 40, 45,
+                    text, color=(153,79,0),font_size=20
+                )
+                btn.base_y  = y_pos
+
+                self.item_buttons[key] = btn
+                self.item_descriptions[key] = config["description"]
+                y_pos += 65
+                self.content_height = len(self.item_buttons) * 65
+                self.max_scroll = max(0, self.content_height - self.scroll_area_height)
+    def update(self,mouse_pos,mouse_clicked,player,items):
+
+        if not self.is_open:
+            return None
+
+        super().update(mouse_pos,mouse_clicked)
+
+        bought = None
+
+        for key,btn in self.item_buttons.items():
+            cost = player.get_item_cost(key)
+            player_level = player.player_level
+            item_level = player.inventory.all_game_items[key]['unlock_level']
+            can_afford = cost is not None and player.can_afford(cost)
+            is_unlocked = player_level >= item_level
+            config = items[key]
+            if cost is None:
+                text = f"{config['name']} - Level not high enough"
+            else:
+                text = f"{config['name']} (Amount Owned:{player.inventory.items_in_inventory[key]}) - ${cost}"
+            if btn.update(mouse_pos, mouse_clicked):
+                bought = key
+        return bought
+
+    def draw(self,screen):
+        if not self.is_open:
+            return
+
+        self.draw_base(screen)
+
+        # Clip drawing to scroll area
+
+        clip_rect = pygame.Rect(
+            self.x,
+            self.scroll_area_top,
+            self.width,
+            self.scroll_area_height
+        )
+        screen.set_clip(clip_rect)
+        # Draw buttons with scrolling
+        for key, btn in self.item_buttons.items():
+            btn.rect.y = btn.base_y - self.scroll_offset
+            btn.draw(screen)
+
+            # Draw description below button
+            desc = self.item_descriptions.get(key, "")
+            desc_surface = self.desc_font.render(desc, True, (180, 180, 200))
+            screen.blit(desc_surface, (btn.rect.x + 10, btn.rect.bottom + 2))
+
+        # Remove clipping
+        screen.set_clip(None)
+
+        # Draw scrollbar on top
+        self.draw_scrollbar(screen)
+
 
 
 class MainMenuButtons:
@@ -601,7 +791,11 @@ class MainMenuButtons:
             "UPGRADES",
             color=(60, 60, 120), hover_color=(80, 80, 160), font_size=28
         )
-
+        self.item_shop_btn = Button(
+            padding + btn_width + 180, btn_y,
+            btn_width, btn_height,
+            "Item Shop",
+            color=(204, 102, 0), hover_color=(255, 128, 0), font_size=28)
         # Collect button (center, but will be positioned dynamically)
         self.collect_btn = Button(
             screen_width // 2 - 50  , btn_y,
@@ -617,15 +811,19 @@ class MainMenuButtons:
             "ticket_shop": self.ticket_shop_btn.update(mouse_pos, mouse_clicked),
             "upgrades": self.upgrades_btn.update(mouse_pos, mouse_clicked),
             "collect": self.collect_btn.update(mouse_pos, mouse_clicked),
+            "item_shop": self.item_shop_btn.update(mouse_pos,mouse_clicked)
         }
         return result
 
     def set_collect_enabled(self, enabled):
+        """Sets collect enabled"""
         self.collect_btn.set_enabled(enabled)
 
     def draw(self, screen):
+        """Draws all the buttons on main screen"""
         self.ticket_shop_btn.draw(screen)
         self.upgrades_btn.draw(screen)
+        self.item_shop_btn.draw(screen)
 
         # Only draw collect if enabled
         if self.collect_btn.enabled:
