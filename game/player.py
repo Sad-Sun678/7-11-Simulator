@@ -68,10 +68,31 @@ UPGRADES = {
         "icon": "",
     },
 }
-ITEMS = {"beer":{"name":"Beer",
+ITEMS = {"beer5":{"name":"Beer",
                  'description':"Get drunk. Increase morale",
                  "base_cost":10,
-                 "unlock_level":1}}
+                 "unlock_level":1},
+         "beer4": {"name": "Beer",
+                  'description': "Get drunk. Increase morale",
+                  "base_cost": 10,
+                  "unlock_level": 1},
+"beer3":{"name":"Beer",
+                 'description':"Get drunk. Increase morale",
+                 "base_cost":10,
+                 "unlock_level":1},
+"beer2":{"name":"Beer",
+                 'description':"Get drunk. Increase morale",
+                 "base_cost":10,
+                 "unlock_level":1},
+"beer1":{"name":"Beer",
+                 'description':"Get drunk. Increase morale",
+                 "base_cost":10,
+                 "unlock_level":1},
+"beer6":{"name":"Beer",
+                 'description':"Get drunk. Increase morale",
+                 "base_cost":10,
+                 "unlock_level":1}
+         }
 
 class Inventory:
     def __init__(self):
@@ -237,6 +258,7 @@ class Player:
             "tickets_scratched": self.tickets_scratched,
             "biggest_win": self.biggest_win,
             "upgrades": self.upgrades,
+            "items":self.inventory.items_in_inventory
         }
         try:
             with open(self.save_file, "w") as f:
@@ -263,6 +285,10 @@ class Player:
             saved_upgrades = data.get("upgrades", {})
             for key in UPGRADES:
                 self.upgrades[key] = saved_upgrades.get(key, 0)
+            # Load Items (handle missing keys)
+            saved_items  = data.get("items",{})
+            for key in ITEMS:
+                self.inventory.items_in_inventory[key] = saved_items.get(key,0)
 
         except Exception as e:
             print(f"Could not load game: {e}")

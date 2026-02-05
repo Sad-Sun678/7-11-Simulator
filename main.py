@@ -426,6 +426,8 @@ class Game:
                         self.upgrade_shop.handle_scroll(event.y)
                     if self.ticket_shop.is_in_scroll_area(pygame.mouse.get_pos()):
                         self.ticket_shop.handle_scroll(event.y)
+                    if self.item_shop.is_in_scroll_area(pygame.mouse.get_pos()):
+                        self.item_shop.handle_scroll(event.y)
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:

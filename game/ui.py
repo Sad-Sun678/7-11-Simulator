@@ -678,6 +678,7 @@ class ItemShopPopup(PopupMenu):
         self.item_buttons = {}
 
         self.item_descriptions = {}
+        self.scroll_offset = 0
     def setup_buttons(self,consumable_items,player):
         self.item_buttons = {}
         self.item_descriptions = {}
@@ -759,6 +760,18 @@ class ItemShopPopup(PopupMenu):
         # Draw scrollbar on top
         self.draw_scrollbar(screen)
 
+class InventoryPopup(PopupMenu):
+    """Popup menu for using purchased items"""
+
+    def __init__(self, screen_width, screen_height):
+        super().__init__(
+            screen_width, screen_height,
+            500, 500,
+            "TICKET SHOP",
+            (40, 60, 40), (80, 140, 80)
+        )
+        self.inventory_buttons = {}
+        self.scroll_offset = 0
 
 
 class MainMenuButtons:
