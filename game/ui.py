@@ -767,11 +767,98 @@ class InventoryPopup(PopupMenu):
         super().__init__(
             screen_width, screen_height,
             500, 500,
-            "TICKET SHOP",
+            "INVENTORY",
             (40, 60, 40), (80, 140, 80)
         )
         self.inventory_buttons = {}
+        self.inventory_descriptions = {}
         self.scroll_offset = 0
+
+    def setup_buttons(self, player):
+        print("INVENTORY:", player.inventory.items_in_inventory)
+
+        self.inventory_buttons = {}
+        self.inventory_descriptions = {}
+
+        y_pos = self.y + 70
+
+        for key, config in player.inventory.all_game_items.items():
+            owned = player.inventory.items_in_inventory.get(key, 0)
+
+            # SKIP items player doesn't own
+            if owned <= 0:
+                continue
+            name = config["name"]
+
+            text = f"{name} - Owned: {owned}"
+
+            btn = Button(
+                self.x + 20, y_pos,
+                self.width - 40, 45,
+                text,
+                color=(70, 70, 110),
+                font_size=22
+            )
+
+            btn.base_y = y_pos
+
+            self.inventory_buttons[key] = btn
+            self.inventory_descriptions[key] = config["description"]
+
+            y_pos += 65
+
+        self.content_height = len(self.inventory_buttons) * 65
+        self.max_scroll = max(0, self.content_height - self.scroll_area_height)
+
+    def update(self, mouse_pos, mouse_clicked, player):
+        if not self.is_open:
+            return None
+
+        super().update(mouse_pos, mouse_clicked)
+
+        used_item = None
+
+        for key, btn in self.inventory_buttons.items():
+            config = player.inventory.all_game_items[key]
+            owned = player.inventory.items_in_inventory.get(key, 0)
+            name = config["name"]
+
+            # Enable only if player owns at least one
+            btn.set_enabled(owned > 0)
+
+            # Update button text
+            btn.set_text(f"{name} - Owned: {owned}")
+
+            if btn.update(mouse_pos, mouse_clicked):
+                used_item = key
+
+        return used_item
+
+    def draw(self, screen):
+        if not self.is_open:
+            return
+
+        self.draw_base(screen)
+
+        clip_rect = pygame.Rect(
+            self.x,
+            self.scroll_area_top,
+            self.width,
+            self.scroll_area_height
+        )
+        screen.set_clip(clip_rect)
+
+        for key, btn in self.inventory_buttons.items():
+            btn.rect.y = btn.base_y - self.scroll_offset
+            btn.draw(screen)
+
+            desc = self.inventory_descriptions.get(key, "")
+            desc_surface = self.desc_font.render(desc, True, (180, 180, 200))
+            screen.blit(desc_surface, (btn.rect.x + 10, btn.rect.bottom + 2))
+
+        screen.set_clip(None)
+
+        self.draw_scrollbar(screen)
 
 
 class MainMenuButtons:
@@ -809,7 +896,13 @@ class MainMenuButtons:
             btn_width, btn_height,
             "Item Shop",
             color=(204, 102, 0), hover_color=(255, 128, 0), font_size=28)
-        # Collect button (center, but will be positioned dynamically)
+        self.inventory_btn = Button(
+            padding + btn_width + 350, btn_y,
+            btn_width, btn_height,
+            "Inventory",
+            color=(204, 204, 0), hover_color=(255, 255, 0),
+            font_size=28)
+        #Collect button (center, but will be positioned dynamically)
         self.collect_btn = Button(
             screen_width // 2 - 50  , btn_y,
             150, btn_height,"COLLECT",
@@ -824,7 +917,8 @@ class MainMenuButtons:
             "ticket_shop": self.ticket_shop_btn.update(mouse_pos, mouse_clicked),
             "upgrades": self.upgrades_btn.update(mouse_pos, mouse_clicked),
             "collect": self.collect_btn.update(mouse_pos, mouse_clicked),
-            "item_shop": self.item_shop_btn.update(mouse_pos,mouse_clicked)
+            "item_shop": self.item_shop_btn.update(mouse_pos,mouse_clicked),
+            "inventory_screen":self.inventory_btn.update(mouse_pos,mouse_clicked)
         }
         return result
 
@@ -837,7 +931,7 @@ class MainMenuButtons:
         self.ticket_shop_btn.draw(screen)
         self.upgrades_btn.draw(screen)
         self.item_shop_btn.draw(screen)
-
+        self.inventory_btn.draw(screen)
         # Only draw collect if enabled
         if self.collect_btn.enabled:
             self.collect_btn.draw(screen)

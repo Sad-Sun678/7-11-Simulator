@@ -68,31 +68,12 @@ UPGRADES = {
         "icon": "",
     },
 }
-ITEMS = {"beer5":{"name":"Beer",
+ITEMS = {"beer":{"name":"Beer",
                  'description':"Get drunk. Increase morale",
                  "base_cost":10,
-                 "unlock_level":1},
-         "beer4": {"name": "Beer",
-                  'description': "Get drunk. Increase morale",
-                  "base_cost": 10,
-                  "unlock_level": 1},
-"beer3":{"name":"Beer",
-                 'description':"Get drunk. Increase morale",
-                 "base_cost":10,
-                 "unlock_level":1},
-"beer2":{"name":"Beer",
-                 'description':"Get drunk. Increase morale",
-                 "base_cost":10,
-                 "unlock_level":1},
-"beer1":{"name":"Beer",
-                 'description':"Get drunk. Increase morale",
-                 "base_cost":10,
-                 "unlock_level":1},
-"beer6":{"name":"Beer",
-                 'description':"Get drunk. Increase morale",
-                 "base_cost":10,
-                 "unlock_level":1}
-         }
+                 "unlock_level":1,
+                 "effects":['drunk','lucky']}}
+
 
 class Inventory:
     def __init__(self):
@@ -118,6 +99,7 @@ class Player:
         self.morale = 100
         self.morale_cap = 100
         self.player_level = 1
+        self.active_effects  = {}
         self.inventory = Inventory()
         for key, amount in self.inventory.items_in_inventory.items():
             print(key)
@@ -205,6 +187,56 @@ class Player:
             self.save_game()
             return True
         return False
+    def try_use_item(self,item_key):
+        """looks to see if player has item in inventory"""
+        result = None
+        for item, amount in self.inventory.items_in_inventory.items():
+            if item == item_key:
+                result = True
+            else:
+                result = False
+        return result
+
+    def consume_item(self, item_key, amount=1):
+        """Removes item from inventory and applies its effects"""
+
+        # Not enough items
+        if self.inventory.items_in_inventory.get(item_key, 0) < amount:
+            return
+
+        # Remove item
+        self.inventory.items_in_inventory[item_key] -= amount
+
+        # Apply effects
+        effects = self.inventory.all_game_items[item_key].get("effects", [])
+
+        for effect in effects:
+            self.add_effect_to_player(effect)
+
+        else:
+            print("CONSUME_ITEM IN PLAYER CLASS SAYS: item key not found. nothing consumed")
+
+    def add_effect_to_player(self, effect):
+
+        effect = effect.lower()
+
+        if effect == "lucky":
+            self.active_effects["lucky"] = 30
+
+        elif effect == "drunk":
+            self.active_effects["drunk"] = 30
+
+    def has_effect(self, name: str) -> bool:
+        """return active effects"""
+        return self.active_effects.get(name, 0) > 0
+
+    def decay_active_effects(self, dt):
+        for effect in list(self.active_effects.keys()):
+            self.active_effects[effect] -= dt
+
+            if self.active_effects[effect] <= 0:
+                del self.active_effects[effect]
+
     def can_afford(self, amount):
         """Check if player can afford something."""
         return self.money >= amount

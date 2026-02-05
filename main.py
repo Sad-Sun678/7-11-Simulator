@@ -6,7 +6,7 @@ import math
 from game.ticket import ScratchTicket, TICKET_TYPES, create_ticket
 from game.player import Player, UPGRADES, ITEMS
 from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
-                     MainMenuButtons, AutoCollectTimer,HealthBar,DrunkEffect,ItemShopPopup)
+                     MainMenuButtons, AutoCollectTimer, HealthBar, DrunkEffect, ItemShopPopup, InventoryPopup)
 from game.particles import ParticleSystem, ScreenShake
 
 # Initialize Pygame
@@ -43,6 +43,7 @@ class Game:
 
         self.item_shop = ItemShopPopup(SCREEN_WIDTH, SCREEN_HEIGHT)
 
+        self.inventory_screen = InventoryPopup(SCREEN_WIDTH,SCREEN_HEIGHT)
         # Main screen buttons
         self.main_buttons = MainMenuButtons(SCREEN_WIDTH, SCREEN_HEIGHT)
 
@@ -277,6 +278,15 @@ class Game:
                     item_name = ITEMS[bought_item]['name']
                     self.messages.add_message(f"{item_name} purchased!",(150, 150, 255))
                     self.item_shop.setup_buttons(ITEMS,self.player)
+        elif  self.inventory_screen.is_open:
+            used_item = self.inventory_screen.update(mouse_pos,mouse_clicked,self.player)
+            if used_item:
+                print(used_item)
+                if self.player.try_use_item(used_item):
+                    self.player.consume_item(used_item)
+                    self.messages.add_message(f"{used_item.title()} Consumed!")
+                    print(f"active effects:{self.player.active_effects.items()}")
+
         else:
             # No popup open - handle main game
 
@@ -296,6 +306,9 @@ class Game:
             elif button_clicks["item_shop"]:
                 self.item_shop.setup_buttons(ITEMS, self.player)
                 self.item_shop.open()
+            elif button_clicks["inventory_screen"]:
+                self.inventory_screen.setup_buttons(self.player)
+                self.inventory_screen.open()
             elif button_clicks["collect"]:
                 self.collect_winnings()
 
@@ -308,6 +321,21 @@ class Game:
         # Auto mechanics (always run)
         self.auto_scratch(dt)
         self.auto_collect(dt)
+        self.player.decay_active_effects(dt)
+        # Drive drunk visuals from active effects
+        drunk_active = self.player.active_effects.get("drunk", 0) > 0
+
+        if drunk_active and not self.drunk.enabled:
+            self.drunk.enabled = True  # start effect (keep time running)
+        elif (not drunk_active) and self.drunk.enabled:
+            self.drunk.enabled = False  # stop effect
+            self.drunk.time = 0.0  # optional: reset sway phase
+            if hasattr(self.drunk, "ghost_trails"):
+                self.drunk.ghost_trails.clear()  # optional: clear smear history
+            if hasattr(self.drunk, "ghost_positions"):
+                self.drunk.ghost_positions.clear()  # optional: clear old ghost positions
+            if hasattr(self.drunk, "ghost_cache"):
+                self.drunk.ghost_cache.clear()  # optional: rebuild caches next time
 
         # Update effects
         self.particles.update(dt)
@@ -410,6 +438,7 @@ class Game:
         self.ticket_shop.draw(self.screen)
         self.upgrade_shop.draw(self.screen)
         self.item_shop.draw(self.screen)
+        self.inventory_screen.draw(self.screen)
 
         pygame.display.flip()
 
@@ -436,6 +465,9 @@ class Game:
                             self.ticket_shop.close()
                         elif self.upgrade_shop.is_open:
                             self.upgrade_shop.close()
+                        elif self.inventory_screen.is_open:
+                            self.inventory_screen.close()
+
                         else:
                             self.running = False
                     elif event.key == pygame.K_r:
