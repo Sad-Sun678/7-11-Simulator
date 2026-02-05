@@ -115,8 +115,12 @@ class Player:
         self.load_game()
 
     def get_luck_bonus(self):
-        """Get the luck bonus from upgrades."""
-        return self.upgrades["lucky_charm"]
+        """Get the luck bonus from upgrades and active effects."""
+        lucky_time = self.active_effects.get("lucky", 0)  # 0 if not present
+
+        luck_bonus = 5 if lucky_time > 0 else 0
+
+        return self.upgrades["lucky_charm"] + luck_bonus
 
     def get_scratch_radius(self):
         """Get scratch radius based on upgrade level."""
@@ -177,6 +181,7 @@ class Player:
             return True
         return False
     def buy_item(self, item_key):
+        """Purchase an item. returns true if successful"""
         cost = self.get_item_cost(item_key)
         if cost is None:
             return False
@@ -217,6 +222,7 @@ class Player:
             print("CONSUME_ITEM IN PLAYER CLASS SAYS: item key not found. nothing consumed")
 
     def add_effect_to_player(self, effect):
+        """adds effect and time in seconds to active effects dict"""
 
         effect = effect.lower()
 
