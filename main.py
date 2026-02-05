@@ -75,33 +75,39 @@ class Game:
 
     def _create_background(self):
         """Create static background and separate scratching mat."""
-        bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
-        bg.fill(BG_COLOR)
+
+        # LOAD pixel art background instead of drawing it
+        bg_image = pygame.image.load("assets/background/temp_bg.png").convert()
+        bg = pygame.transform.scale(bg_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
+        # -----------------------
+        # KEEP EVERYTHING BELOW
+        # -----------------------
 
         # Main counter area (STATIC)
-        counter_rect = pygame.Rect(50, 80, SCREEN_WIDTH - 100, SCREEN_HEIGHT - 180)
-        pygame.draw.rect(bg, COUNTER_COLOR, counter_rect, border_radius=20)
-        pygame.draw.rect(bg, (75, 80, 90), counter_rect, 4, border_radius=20)
-
+        # counter_rect = pygame.Rect(50, 80, SCREEN_WIDTH - 100, SCREEN_HEIGHT - 180)
+        # pygame.draw.rect(bg, COUNTER_COLOR, counter_rect, border_radius=20)
+        # pygame.draw.rect(bg, (75, 80, 90), counter_rect, 4, border_radius=20)
 
         # Create SCRATCH MAT as separate surface
-        mat_w = SCREEN_WIDTH - 300
-        mat_h = SCREEN_HEIGHT - 280
+        mat_w = SCREEN_WIDTH // 2
+        mat_h = SCREEN_HEIGHT // 2
 
         mat = pygame.Surface((mat_w, mat_h), pygame.SRCALPHA)
 
         pygame.draw.rect(mat, (45, 50, 60), mat.get_rect(), border_radius=15)
         pygame.draw.rect(mat, (65, 70, 80), mat.get_rect(), 2, border_radius=15)
-        # "Scratch here" text
+
         font = pygame.font.Font(None, 32)
         hint_text = font.render("Buy a ticket to start!", True, (80, 85, 95))
-        # Add text to mat
+
         mat.blit(hint_text, (
-            mat_w // 2 - hint_text.get_width()//2,
-            mat_h// 2
+            mat_w // 2 - hint_text.get_width() // 2,
+            mat_h // 2
         ))
+
         self.mat_surface = mat
-        self.mat_pos = (100, 120)
+        self.mat_pos = (500,250)
 
         return bg
 

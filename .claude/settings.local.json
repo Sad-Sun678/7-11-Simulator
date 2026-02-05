@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(.venvScriptspip.exe install pygame)",
-      "Bash(\".venv\\\\Scripts\\\\pip.exe\" install pygame)",
-      "Bash(\".venv\\\\Scripts\\\\python.exe\" -c \"from game.ticket import ScratchTicket, TICKET_TYPES; from game.player import Player, UPGRADES; from game.ui import HUD, MessagePopup; from game.particles import ParticleSystem; print\\(''All imports successful!''\\)\")"
-    ]
-  }
-}

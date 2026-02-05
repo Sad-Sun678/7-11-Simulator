@@ -14,6 +14,18 @@ SYMBOLS = {
     "star": {"color": (255, 255, 100), "value": 200, "shape": "star"},
 }
 
+SYMBOL_IMAGES = {
+    "cherry": pygame.image.load("assets/symbols/cherry.png"),
+    "lemon": pygame.image.load("assets/symbols/lemon.png"),
+    "grape": pygame.image.load("assets/symbols/grape.png"),
+    "bell": pygame.image.load("assets/symbols/bell.png"),
+    "seven": pygame.image.load("assets/symbols/seven.png"),
+    "diamond": pygame.image.load("assets/symbols/diamond.png"),
+    "star": pygame.image.load("assets/symbols/star.png"),
+    "orange": pygame.image.load("assets/symbols/orange.png")
+}
+
+
 # Ticket type definitions
 TICKET_TYPES = {
     "chud":{"name":"loser",
@@ -485,96 +497,30 @@ class Match3Ticket:
             pygame.draw.circle(self.scratch_surface, (*color, 255), (x, y), random.randint(1, 4))
 
     def _draw_symbol(self, cx, cy, symbol_name, cell_size, is_winner=False):
-        """Draw a symbol at the given position with proper sizing."""
-        sym = SYMBOLS[symbol_name]
-        color = sym["color"]
-        shape = sym["shape"]
+        """Draw a symbol using sprite images instead of procedural shapes."""
 
-        # Symbol size relative to cell
-        symbol_size = int(cell_size * 0.7)
-
-        # Draw highlight for winners
+        # Keep winner highlight exactly as before
         if is_winner:
             pygame.draw.rect(self.base_surface, (255, 255, 150),
-                (cx - cell_size//2 + 2, cy - cell_size//2 + 2, cell_size - 4, cell_size - 4),
-                border_radius=8)
+                             (cx - cell_size // 2 + 2, cy - cell_size // 2 + 2, cell_size - 4, cell_size - 4),
+                             border_radius=8)
 
-        # Draw cell background
+        # Keep cell background exactly as before
         pygame.draw.rect(self.base_surface, (255, 255, 255),
-            (cx - cell_size//2 + 4, cy - cell_size//2 + 4, cell_size - 8, cell_size - 8),
-            border_radius=6)
+                         (cx - cell_size // 2 + 4, cy - cell_size // 2 + 4, cell_size - 8, cell_size - 8),
+                         border_radius=6)
         pygame.draw.rect(self.base_surface, (200, 200, 200),
-            (cx - cell_size//2 + 4, cy - cell_size//2 + 4, cell_size - 8, cell_size - 8),
-            2, border_radius=6)
+                         (cx - cell_size // 2 + 4, cy - cell_size // 2 + 4, cell_size - 8, cell_size - 8),
+                         2, border_radius=6)
 
-        # Draw the symbol shape (scaled to symbol_size)
-        if shape == "circle":
-            # Cherry/Orange - simple filled circle
-            radius = symbol_size // 3
-            pygame.draw.circle(self.base_surface, color, (cx, cy), radius)
-            # Shine
-            pygame.draw.circle(self.base_surface, (255, 255, 255),
-                (cx - radius//3, cy - radius//3), radius//4)
+        # --- NEW PART: sprite drawing ---
 
-        elif shape == "oval":
-            # Lemon - oval shape
-            w = int(symbol_size * 0.6)
-            h = int(symbol_size * 0.4)
-            pygame.draw.ellipse(self.base_surface, color,
-                (cx - w//2, cy - h//2, w, h))
-            pygame.draw.circle(self.base_surface, (255, 255, 200),
-                (cx - w//4, cy - h//4), max(2, h//6))
+        img = SYMBOL_IMAGES[symbol_name]
 
-        elif shape == "cluster":
-            # Grape - cluster of small circles
-            grape_radius = symbol_size // 8
-            offsets = [(-10, -6), (0, -10), (10, -6), (-6, 4), (6, 4), (0, 10)]
-            for ox, oy in offsets:
-                pygame.draw.circle(self.base_surface, color,
-                    (cx + ox * symbol_size // 40, cy + oy * symbol_size // 40), grape_radius)
+        scaled = pygame.transform.scale(img, (cell_size - 16, cell_size - 16))
+        rect = scaled.get_rect(center=(cx, cy))
 
-        elif shape == "bell":
-            # Bell shape
-            bell_w = symbol_size // 2
-            bell_h = symbol_size // 2
-            points = [
-                (cx, cy - bell_h//2),
-                (cx - bell_w//2, cy + bell_h//3),
-                (cx + bell_w//2, cy + bell_h//3),
-            ]
-            pygame.draw.polygon(self.base_surface, color, points)
-            pygame.draw.circle(self.base_surface, color, (cx, cy + bell_h//3), bell_w//4)
-
-        elif shape == "seven":
-            # Lucky 7
-            font = pygame.font.Font(None, int(symbol_size * 0.9))
-            seven_text = font.render("7", True, color)
-            self.base_surface.blit(seven_text,
-                (cx - seven_text.get_width()//2, cy - seven_text.get_height()//2))
-
-        elif shape == "diamond":
-            # Diamond shape
-            d_size = symbol_size // 3
-            points = [
-                (cx, cy - d_size),
-                (cx + d_size, cy),
-                (cx, cy + d_size),
-                (cx - d_size, cy),
-            ]
-            pygame.draw.polygon(self.base_surface, color, points)
-            # Inner shine
-            inner_size = d_size // 2
-            inner_points = [
-                (cx, cy - inner_size),
-                (cx + inner_size, cy),
-                (cx, cy + inner_size),
-                (cx - inner_size, cy),
-            ]
-            pygame.draw.polygon(self.base_surface, (200, 230, 255), inner_points)
-
-        elif shape == "star":
-            # Star shape
-            self._draw_star_symbol(cx, cy, symbol_size // 3, color)
+        self.base_surface.blit(scaled, rect)
 
     def _draw_star_symbol(self, x, y, size, color):
         """Draw a star shape."""
