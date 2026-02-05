@@ -54,6 +54,7 @@ class Player:
         self.tickets_scratched = 0
         self.biggest_win = 0
         self.morale = 100
+        self.morale_cap = 100
 
         # Upgrade levels
         self.upgrades = {key: 0 for key in UPGRADES}
@@ -137,7 +138,19 @@ class Player:
         self.total_earned += amount
         if amount > self.biggest_win:
             self.biggest_win = amount
-
+    def lose_morale(self, amount):
+        print(self.morale)
+        if self.morale > 0:
+            if self.morale - amount <= 0:
+                return
+            else:
+                self.morale -= amount
+    def gain_morale(self,amount):
+        print(self.morale)
+        if self.morale + amount > self.morale_cap:
+            return
+        else:
+            self.morale += amount
     def scratch_ticket(self):
         """Record a scratched ticket."""
         self.tickets_scratched += 1

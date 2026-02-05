@@ -16,6 +16,22 @@ SYMBOLS = {
 
 # Ticket type definitions
 TICKET_TYPES = {
+    "chud":{"name":"loser",
+            "cost":0,
+            "color":(204,0,0),  #Red
+            "scratch_color":(180,180,180), #Gray
+            "prizes":[0,0,0,0,0,0,0,0,0,0],
+            "unlock_threshold":0,
+            "ticket_class": "standard",
+            },
+    "winner":{"name":"winner",
+            "cost":0,
+            "color":(0,255,0),  #Red
+            "scratch_color":(180,180,180), #Gray
+            "prizes":[1000],
+            "unlock_threshold":0,
+            "ticket_class": "standard",
+            },
     "basic": {
         "name": "Basic",
         "cost": 1,

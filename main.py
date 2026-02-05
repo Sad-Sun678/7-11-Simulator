@@ -145,15 +145,18 @@ class Game:
             if prize >= 100:
                 self.particles.add_big_win_particles(ticket_center_x, ticket_center_y, prize)
                 self.screen_shake.shake(15, 0.5)
+                self.player.gain_morale(100)
             elif prize >= 25:
                 self.particles.add_win_particles(ticket_center_x, ticket_center_y, prize, 50)
                 self.screen_shake.shake(8, 0.3)
+                self.player.gain_morale(50)
             else:
                 self.particles.add_win_particles(ticket_center_x, ticket_center_y, prize, 20)
                 self.screen_shake.shake(3, 0.15)
+                self.player.gain_morale(15)
         else:
             self.messages.add_message("Try again!", (255, 150, 100), flag="TRY_AGAIN")
-
+            self.player.lose_morale(5)
         self.main_buttons.set_collect_enabled(True)
 
     def collect_winnings(self):
