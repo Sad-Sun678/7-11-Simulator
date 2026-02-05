@@ -9,7 +9,7 @@ UPGRADES = {
         "base_cost": 25,
         "cost_multiplier": 1.8,
         "max_level": 10,
-        "icon": "🍀",
+        "icon": "",
     },
     "scratch_speed": {
         "name": "Scratch Speed",
@@ -17,7 +17,7 @@ UPGRADES = {
         "base_cost": 15,
         "cost_multiplier": 1.5,
         "max_level": 10,
-        "icon": "⚡",
+        "icon": "",
     },
     "auto_scratcher": {
         "name": "Auto Scratcher",
@@ -25,7 +25,15 @@ UPGRADES = {
         "base_cost": 100,
         "cost_multiplier": 2.5,
         "max_level": 5,
-        "icon": "🤖",
+        "icon": "",
+    },
+    "auto_collect": {
+        "name": "Auto Collect",
+        "description": "Auto-redeem completed tickets",
+        "base_cost": 75,
+        "cost_multiplier": 2.0,
+        "max_level": 5,
+        "icon": "",
     },
     "bulk_buy": {
         "name": "Bulk Buy",
@@ -33,7 +41,7 @@ UPGRADES = {
         "base_cost": 50,
         "cost_multiplier": 2.0,
         "max_level": 5,
-        "icon": "📦",
+        "icon": "",
     },
 }
 
@@ -45,6 +53,7 @@ class Player:
         self.total_spent = 0.0
         self.tickets_scratched = 0
         self.biggest_win = 0
+        self.morale = 100
 
         # Upgrade levels
         self.upgrades = {key: 0 for key in UPGRADES}
@@ -73,6 +82,14 @@ class Player:
     def get_bulk_amount(self):
         """Get how many tickets can be bought at once."""
         return 1 + self.upgrades["bulk_buy"]
+
+    def get_auto_collect_delay(self):
+        """Get auto-collect delay in seconds. Returns None if not unlocked."""
+        level = self.upgrades["auto_collect"]
+        if level == 0:
+            return None
+        # Level 1 = 3s, Level 2 = 2.5s, Level 3 = 2s, Level 4 = 1.5s, Level 5 = 1s
+        return 3.5 - (level * 0.5)
 
     def get_upgrade_cost(self, upgrade_key):
         """Calculate the cost for the next level of an upgrade."""
