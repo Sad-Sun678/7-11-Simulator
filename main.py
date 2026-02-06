@@ -46,6 +46,8 @@ class Game:
         self.inventory_screen = InventoryPopup(SCREEN_WIDTH,SCREEN_HEIGHT)
         # Main screen buttons
         self.main_buttons = MainMenuButtons(SCREEN_WIDTH, SCREEN_HEIGHT)
+        # move the cluster over
+
 
         # HUD and messages
         self.hud = HUD(SCREEN_WIDTH, SCREEN_HEIGHT)
@@ -118,8 +120,8 @@ class Game:
             # Create new ticket centered on the counter
             ticket = create_ticket(
                 ticket_type,
-                SCREEN_WIDTH // 2 - 170,  # Center X (account for ticket width)
-                SCREEN_HEIGHT // 2 - 180,  # Center Y
+                SCREEN_WIDTH // 2 - 100 ,  # Center X (account for ticket width)
+                SCREEN_HEIGHT // 2 - 150,  # Center Y
                 340, 280,
                 luck_bonus=self.player.get_luck_bonus()
             )

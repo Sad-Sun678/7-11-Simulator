@@ -312,13 +312,13 @@ class MessagePopup:
             if msg['flag'] == "AMOUNT_TEXT":
                 text_surface = self.font.render(msg["text"], True, msg["color"])
                 text_surface.set_alpha(msg["alpha"])
-                rect = text_surface.get_rect(center=(center_x, center_y + 120 + y_offset))
+                rect = text_surface.get_rect(center=(center_x + 50, center_y + 120 + y_offset))
                 screen.blit(text_surface, rect)
                 y_offset -= 50
             elif msg['flag'] == "WIN_PRIZE":
                 text_surface = self.font.render(msg["text"], True, msg["color"])
                 text_surface.set_alpha(msg["alpha"])
-                rect = text_surface.get_rect(center=(center_x, center_y + 150 + y_offset))
+                rect = text_surface.get_rect(center=(center_x+50, center_y + 150 + y_offset))
                 screen.blit(text_surface, rect)
                 y_offset -= 50
             elif msg['flag'] == "TRY_AGAIN":
@@ -794,7 +794,7 @@ class InventoryPopup(PopupMenu):
 
             btn = Button(
                 self.x + 20, y_pos,
-                self.width - 40, 45,
+                self.width - 40, 80,
                 text,
                 color=(70, 70, 110),
                 font_size=22
@@ -805,9 +805,9 @@ class InventoryPopup(PopupMenu):
             self.inventory_buttons[key] = btn
             self.inventory_descriptions[key] = config["description"]
 
-            y_pos += 65
+            y_pos += 80
 
-        self.content_height = len(self.inventory_buttons) * 65
+        self.content_height = len(self.inventory_buttons) * 80
         self.max_scroll = max(0, self.content_height - self.scroll_area_height)
 
     def update(self, mouse_pos, mouse_clicked, player):
@@ -860,7 +860,6 @@ class InventoryPopup(PopupMenu):
 
         self.draw_scrollbar(screen)
 
-
 class MainMenuButtons:
     """The main screen buttons to open shops."""
 
@@ -868,15 +867,16 @@ class MainMenuButtons:
         self.screen_width = screen_width
         self.screen_height = screen_height
 
-        # Button dimensions
         btn_width = 160
         btn_height = 50
         padding = 20
 
-        # Position buttons at bottom of screen
         btn_y = screen_height - btn_height - padding
 
-        # Ticket Shop button (left side)
+        # CHANGE THESE TWO VALUES TO MOVE THE WHOLE CLUSTER
+        self.cluster_x = 600
+        self.cluster_y = -100
+
         self.ticket_shop_btn = Button(
             padding, btn_y,
             btn_width, btn_height,
@@ -884,55 +884,68 @@ class MainMenuButtons:
             color=(60, 120, 60), hover_color=(80, 160, 80), font_size=28
         )
 
-        # Upgrades button (right of ticket shop)
         self.upgrades_btn = Button(
             padding + btn_width + 10, btn_y,
             btn_width, btn_height,
             "UPGRADES",
             color=(60, 60, 120), hover_color=(80, 80, 160), font_size=28
         )
+
         self.item_shop_btn = Button(
             padding + btn_width + 180, btn_y,
             btn_width, btn_height,
             "Item Shop",
-            color=(204, 102, 0), hover_color=(255, 128, 0), font_size=28)
+            color=(204, 102, 0), hover_color=(255, 128, 0), font_size=28
+        )
+
         self.inventory_btn = Button(
             padding + btn_width + 350, btn_y,
             btn_width, btn_height,
             "Inventory",
-            color=(204, 204, 0), hover_color=(255, 255, 0),
-            font_size=28)
-        #Collect button (center, but will be positioned dynamically)
+            color=(204, 204, 0), hover_color=(255, 255, 0), font_size=28
+        )
+
         self.collect_btn = Button(
-            screen_width // 2 - 50  , btn_y,
-            150, btn_height,"COLLECT",
+            padding + btn_width + 115 , btn_y - 70,
+            150, btn_height-10,
+            "COLLECT",
             color=(120, 160, 60), hover_color=(160, 200, 80),
             font_size=28
         )
+
         self.collect_btn.set_enabled(False)
 
+        self._buttons = [
+            self.ticket_shop_btn,
+            self.upgrades_btn,
+            self.item_shop_btn,
+            self.inventory_btn,
+            self.collect_btn
+        ]
+
+        # Apply cluster offset immediately
+        for btn in self._buttons:
+            btn.set_pos(btn.rect.x + self.cluster_x,
+                        btn.rect.y + self.cluster_y)
+
     def update(self, mouse_pos, mouse_clicked):
-        """Update buttons. Returns dict of which buttons were clicked."""
-        result = {
+        return {
             "ticket_shop": self.ticket_shop_btn.update(mouse_pos, mouse_clicked),
             "upgrades": self.upgrades_btn.update(mouse_pos, mouse_clicked),
             "collect": self.collect_btn.update(mouse_pos, mouse_clicked),
-            "item_shop": self.item_shop_btn.update(mouse_pos,mouse_clicked),
-            "inventory_screen":self.inventory_btn.update(mouse_pos,mouse_clicked)
+            "item_shop": self.item_shop_btn.update(mouse_pos, mouse_clicked),
+            "inventory_screen": self.inventory_btn.update(mouse_pos, mouse_clicked)
         }
-        return result
 
     def set_collect_enabled(self, enabled):
-        """Sets collect enabled"""
         self.collect_btn.set_enabled(enabled)
 
     def draw(self, screen):
-        """Draws all the buttons on main screen"""
         self.ticket_shop_btn.draw(screen)
         self.upgrades_btn.draw(screen)
         self.item_shop_btn.draw(screen)
         self.inventory_btn.draw(screen)
-        # Only draw collect if enabled
+
         if self.collect_btn.enabled:
             self.collect_btn.draw(screen)
 
