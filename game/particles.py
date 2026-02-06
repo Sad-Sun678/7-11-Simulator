@@ -2,9 +2,14 @@ import pygame
 import random
 import math
 
+coin_img = pygame.image.load("assets/particles/coin.png")
+dollar_img = pygame.image.load("assets/particles/dollar.png")
+gem_img = pygame.image.load("assets/particles/gem.png")
+
+MONEY_SPRITES = [coin_img, dollar_img,gem_img]
 
 class Particle:
-    def __init__(self, x, y, color, velocity, lifetime=1.0, size=4, gravity=0):
+    def __init__(self, x, y, color, velocity, lifetime=1.0, size=4, gravity=0, sprite=None):
         self.x = x
         self.y = y
         self.color = color
@@ -15,13 +20,17 @@ class Particle:
         self.gravity = gravity
         self.alpha = 255
 
+        self.sprite = sprite
+
+        if self.sprite:
+            self.sprite = pygame.transform.smoothscale(self.sprite, (size, size))
+
     def update(self, dt):
         self.x += self.vx * dt
         self.y += self.vy * dt
         self.vy += self.gravity * dt
         self.lifetime -= dt
 
-        # Fade out
         if self.lifetime < self.max_lifetime * 0.5:
             self.alpha = int(255 * (self.lifetime / (self.max_lifetime * 0.5)))
 
@@ -31,11 +40,20 @@ class Particle:
         if self.alpha <= 0:
             return
 
-        # Create a surface for the particle with alpha
+        # MONEY PARTICLES (sprites)
+        if self.sprite:
+            img = self.sprite.copy()
+            img.set_alpha(self.alpha)
+            rect = img.get_rect(center=(self.x, self.y))
+            screen.blit(img, rect)
+            return
+
+        # SCRATCH PARTICLES (circles)
         surf = pygame.Surface((self.size * 2, self.size * 2), pygame.SRCALPHA)
         color_with_alpha = (*self.color, self.alpha)
         pygame.draw.circle(surf, color_with_alpha, (self.size, self.size), self.size)
         screen.blit(surf, (self.x - self.size, self.y - self.size))
+
 
 
 class ParticleSystem:
@@ -84,12 +102,15 @@ class ParticleSystem:
             color = random.choice(colors)
 
             particle = Particle(
-                x, y, color,
+                x, y,
+                (255, 255, 255),  # dummy color (unused)
                 (vx, vy),
                 lifetime=random.uniform(1.0, 2.0),
-                size=random.randint(3, 8),
-                gravity=200
+                size=random.randint(12, 20),
+                gravity=200,
+                sprite=random.choice(MONEY_SPRITES)
             )
+
             self.particles.append(particle)
 
     def add_big_win_particles(self, x, y, amount, count=80):

@@ -181,21 +181,52 @@ class Game:
             ticket_center_x = self.current_ticket.x + self.current_ticket.width // 2
             ticket_center_y = self.current_ticket.y + self.current_ticket.height // 2
 
-            if prize >= 100:
+            # $1000+ JACKPOT
+            if prize >= 1000:
                 self.particles.add_big_win_particles(ticket_center_x, ticket_center_y, prize)
-                self.screen_shake.shake(15, 0.5)
-                self.player.gain_morale(100)
+                self.screen_shake.shake(48, 1.2)
+                self.player.gain_morale(400)
+
+            # $500+
+            elif prize >= 500:
+                self.particles.add_big_win_particles(ticket_center_x, ticket_center_y, prize)
+                self.screen_shake.shake(40, 0.9)
+                self.player.gain_morale(250)
+
+            # $250+
+            elif prize >= 250:
+                self.particles.add_big_win_particles(ticket_center_x, ticket_center_y, prize)
+                self.screen_shake.shake(32, 0.7)
+                self.player.gain_morale(180)
+
+            # $100+
+            elif prize >= 100:
+                self.particles.add_big_win_particles(ticket_center_x, ticket_center_y, prize)
+                self.screen_shake.shake(22, 0.55)
+                self.player.gain_morale(120)
+
+            # $50+
+            elif prize >= 50:
+                self.particles.add_win_particles(ticket_center_x, ticket_center_y, prize, 80)
+                self.screen_shake.shake(14, 0.4)
+                self.player.gain_morale(70)
+
+            # $25+
             elif prize >= 25:
                 self.particles.add_win_particles(ticket_center_x, ticket_center_y, prize, 50)
                 self.screen_shake.shake(8, 0.3)
                 self.player.gain_morale(50)
+
+            # Small wins
             else:
                 self.particles.add_win_particles(ticket_center_x, ticket_center_y, prize, 20)
-                self.screen_shake.shake(3, 0.15)
+                self.screen_shake.shake(4, 0.18)
                 self.player.gain_morale(15)
+
         else:
             self.messages.add_message("Try again!", (255, 150, 100), flag="TRY_AGAIN")
             self.player.lose_morale(5)
+
         self.main_buttons.set_collect_enabled(True)
 
     def collect_winnings(self):
