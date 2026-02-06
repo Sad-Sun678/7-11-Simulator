@@ -99,6 +99,9 @@ class Player:
         self.morale = 100
         self.morale_cap = 100
         self.player_level = 1
+        self.max_hunger = 100
+        self.current_hunger = 100
+        self.hunger_decay_rate = 4.0 # hunger drain per second
         self.active_effects  = {}
         self.inventory = Inventory()
         for key, amount in self.inventory.items_in_inventory.items():
@@ -121,7 +124,17 @@ class Player:
         luck_bonus = 5 if lucky_time > 0 else 0
 
         return self.upgrades["lucky_charm"] + luck_bonus
+    def drain_hunger(self, dt):
+        """Drain hunger over time (dt-based)."""
 
+        self.current_hunger -= self.hunger_decay_rate * dt
+
+        # Clamp
+        if self.current_hunger < 0:
+            self.current_hunger = 0
+    def fill_hunger(self,amount):
+        """Fill hunger by an amount"""
+        self.current_hunger += amount
     def get_scratch_radius(self):
         """Get scratch radius based on upgrade level."""
         base_radius = 20
@@ -268,6 +281,18 @@ class Player:
                 return
             else:
                 self.morale -= amount
+
+    def passive_morale_drain(self, dt):
+        """Slow morale loss over time."""
+
+        drain_rate = 2.5  # morale per second (tweak this)
+
+        if self.morale > 0:
+            self.morale -= drain_rate * dt
+
+            if self.morale < 0:
+                self.morale = 0
+
     def gain_morale(self,amount):
         print(self.morale)
         if self.morale + amount > self.morale_cap:

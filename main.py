@@ -6,7 +6,8 @@ import math
 from game.ticket import ScratchTicket, TICKET_TYPES, create_ticket
 from game.player import Player, UPGRADES, ITEMS
 from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
-                     MainMenuButtons, AutoCollectTimer, HealthBar, DrunkEffect, ItemShopPopup, InventoryPopup)
+                     MainMenuButtons, AutoCollectTimer, DrunkEffect, ItemShopPopup, InventoryPopup,
+                     StatBar,Cigarette)
 from game.particles import ParticleSystem, ScreenShake
 
 # Initialize Pygame
@@ -53,13 +54,24 @@ class Game:
         self.hud = HUD(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.messages = MessagePopup()
         self.auto_collect_timer_ui = AutoCollectTimer()
-        self.health_bar = HealthBar(SCREEN_WIDTH//2 + 680,SCREEN_HEIGHT//2 - 250,15,self.player.morale,"MORALE")
-
+        self.hunger_bar = StatBar(self.player,50,50,200,25,("current_hunger","max_hunger"))
+        self.morale_bar = StatBar(self.player,50,80,200,25,("morale","morale_cap"),color=(0,76,153))
         # Effects
         self.particles = ParticleSystem()
         self.screen_shake = ScreenShake()
         # Drunk effect (debug)
         self.drunk = DrunkEffect()
+        # Cigarette
+        self.cig_idle = pygame.image.load("assets/sprites/cig_idle.png").convert_alpha()
+        self.cig_smoking = pygame.image.load("assets/sprites/cig_smoking.png").convert_alpha()
+
+        self.cigarette = Cigarette(
+            self.cig_idle,
+            self.cig_smoking,
+            1500, 420,
+            scale=2.0,
+            particle_system=self.particles
+        )
 
         # State
         self.scratching = False
@@ -361,6 +373,9 @@ class Game:
         self.auto_scratch(dt)
         self.auto_collect(dt)
         self.player.decay_active_effects(dt)
+        self.player.drain_hunger(dt)
+        self.player.passive_morale_drain(dt)
+
         # Drive drunk visuals from active effects
         drunk_active = self.player.active_effects.get("drunk", 0) > 0
 
@@ -380,7 +395,6 @@ class Game:
         self.particles.update(dt)
         self.screen_shake.update(dt)
         self.messages.update(dt)
-        self.health_bar.update(self.player.morale)
         # if drunk on update drunk
         self.drunk.update(dt)
 
@@ -461,8 +475,11 @@ class Game:
 
         # Draw HUD
         self.hud.draw(self.screen, self.player)
-        # Draw Health Bar
-        self.health_bar.draw(self.screen)
+        # Draw Morale Bar
+        self.morale_bar.draw(self.screen)
+
+        # Draw Hunger Bar
+        self.hunger_bar.draw(self.screen)
         # Draw main buttons
         self.main_buttons.draw(self.screen)
 
@@ -471,7 +488,7 @@ class Game:
 
         # Draw messages
         self.messages.draw(self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-
+        self.cigarette.draw(self.screen)
 
         # Draw popup menus (on top of everything)
         self.ticket_shop.draw(self.screen)
@@ -522,8 +539,16 @@ class Game:
 
                     elif event.key == pygame.K_d:
                         # Press D to test things :)
-                        self.drunk.toggle()
+                        self.player.current_hunger -= 10
 
+                keys = pygame.key.get_pressed()
+
+                if keys[pygame.K_SPACE]:
+                    self.cigarette.start_smoking()
+                    if self.player.morale < self.player.morale_cap:
+                        self.player.morale += 15 * dt  # morale gain while smoking
+                else:
+                    self.cigarette.stop_smoking()
 
             self.update(dt)
             self.draw()

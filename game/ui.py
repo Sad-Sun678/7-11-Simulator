@@ -135,59 +135,137 @@ class DrunkEffect:
         screen.blit(surface, real_offset)
 
 
-class HealthBar:
-    def __init__(self, x, y, width, height, text,
-                 color=(0, 0, 153), hover_color=(0, 0, 255),
-                 font_size=24, text_color=(255, 255, 255)):
 
-        # Static frame
-        self.frame_rect = pygame.Rect(x, y, width, height)
+import pygame
 
-        # Dynamic fill
-        self.fill_rect = pygame.Rect(x, y, width, height)
+import pygame
 
-        self.max_height = height
+import pygame
 
-        self.text = text
-        self.color = color
-        self.hover_color = hover_color
-        self.font = pygame.font.Font(None, font_size)
-        self.hovered = False
-        self.text_color = text_color
-        self.enabled = True
+import pygame
 
-    def set_pos(self, x, y):
-        self.frame_rect.topleft = (x, y)
-        self.fill_rect.bottomleft = self.frame_rect.bottomleft
+class Cigarette:
+    def __init__(
+        self,
+        idle_image,
+        smoking_image,
+        x, y,particle_system,
+        scale=1.0,
+        message="HOLD SPACE TO SMOKE",
+        panel_alpha=140
+    ):
+        self.x = x
+        self.y = y
+        self.is_smoking = False
+        self.particle_system = particle_system
 
-    # value = current morale / health (pixels)
-    def update(self, value):
+        self.padding = 10
+        self.border_thickness = 2
+        self.border_color = (220, 40, 40)
 
-        # Clamp
-        value = max(0, min(self.max_height, value))
+        self.panel_alpha = panel_alpha
 
-        # Change inner height
-        self.fill_rect.height = value
+        self.message = message
 
-        # Keep fill anchored to bottom
-        self.fill_rect.bottom = self.frame_rect.bottom
+        self.font = pygame.font.Font(None, 22)
+        self.live_font = pygame.font.Font(None, 20)
+
+        self.text_color = (220, 40, 40)
+
+        # Blink setup
+        self.blink_interval = 500  # ms
+        self.last_blink = pygame.time.get_ticks()
+        self.show_dot = True
+
+        # Scale images ONCE
+        idle_w = int(idle_image.get_width() * scale)
+        idle_h = int(idle_image.get_height() * scale)
+
+        smoke_w = int(smoking_image.get_width() * scale)
+        smoke_h = int(smoking_image.get_height() * scale)
+
+        self.idle_image = pygame.transform.smoothscale(idle_image, (idle_w, idle_h))
+        self.smoking_image = pygame.transform.smoothscale(smoking_image, (smoke_w, smoke_h))
+
+        self.image_rect = self.idle_image.get_rect(topleft=(x, y))
+
+        # Frame rect
+        self.frame_rect = pygame.Rect(
+            self.image_rect.x - self.padding,
+            self.image_rect.y - self.padding,
+            self.image_rect.width + self.padding * 2,
+            self.image_rect.height + self.padding * 2
+        )
+
+        # Inner panel surface
+        self.panel_surface = pygame.Surface(
+            (self.frame_rect.width, self.frame_rect.height),
+            pygame.SRCALPHA
+        )
+
+        self.panel_surface.fill((0, 0, 0, self.panel_alpha))
+
+    def start_smoking(self):
+        self.is_smoking = True
+
+    def stop_smoking(self):
+        self.is_smoking = False
+
+    def update_blink(self):
+        now = pygame.time.get_ticks()
+
+        if now - self.last_blink > self.blink_interval:
+            self.show_dot = not self.show_dot
+            self.last_blink = now
 
     def draw(self, screen):
+        self.update_blink()
+        if self.is_smoking:
+            self.particle_system.add_smoke(
+                self.image_rect.right - 50,
+                self.image_rect.top + 65
+            )
 
-        color = self.hover_color if self.hovered else self.color
+        image = self.smoking_image if self.is_smoking else self.idle_image
 
-        # Draw inside (shrinking bar)
-        pygame.draw.rect(screen, color, self.fill_rect, border_radius=50)
+        # ----- LIVE HEADER -----
 
-        # Draw border (never changes)
-        border_color = tuple(max(0, c - 40) for c in color)
-        pygame.draw.rect(screen, border_color, self.frame_rect, 3, border_radius=10)
+        header_y = self.frame_rect.y - 22
+        header_x = self.frame_rect.x
 
-        # Draw text centered on frame
-        text_color = self.text_color if self.enabled else (150, 150, 150)
-        text_surface = self.font.render(self.text, True, text_color)
-        text_rect = text_surface.get_rect(center=self.frame_rect.center)
+        live_text = self.live_font.render("LIVE CIGGY CAM", True, self.text_color)
+        screen.blit(live_text, (header_x + 18, header_y))
+
+        # Blinking red dot
+        if self.show_dot:
+            pygame.draw.circle(
+                screen,
+                (220, 40, 40),
+                (header_x + 8, header_y + 8),
+                5
+            )
+
+        # ----- PANEL -----
+
+        screen.blit(self.panel_surface, self.frame_rect.topleft)
+
+        pygame.draw.rect(
+            screen,
+            self.border_color,
+            self.frame_rect,
+            self.border_thickness
+        )
+
+        screen.blit(image, self.image_rect.topleft)
+
+        # Message below
+        text_surface = self.font.render(self.message, True, self.text_color)
+        text_rect = text_surface.get_rect(
+            midtop=(self.frame_rect.centerx, self.frame_rect.bottom + 6)
+        )
+
         screen.blit(text_surface, text_rect)
+
 
 
 
@@ -979,3 +1057,78 @@ class AutoCollectTimer:
         # Draw text
         text = self.font.render(f"Auto-collect: {time_remaining:.1f}s", True, (200, 200, 200))
         screen.blit(text, (x - text.get_width() // 2, y + bar_height + 5))
+import pygame
+
+import pygame
+
+import pygame
+
+class StatBar:
+    def __init__(
+        self,
+        player,
+        x, y, width, height,
+        current_and_max,   # ("current_hunger", "max_hunger")
+        color=(80,180,80),
+        back_color=(40,40,40),
+        border_color=(0,0,0),
+        radius=12
+    ):
+        self.player = player
+
+        # Attribute names
+        self.current_attr, self.max_attr = current_and_max
+
+        self.rect = pygame.Rect(x, y, width, height)
+
+        self.color = color
+        self.back_color = back_color
+        self.border_color = border_color
+        self.radius = radius
+        self.border = 3
+
+    def get_percent(self):
+        current = getattr(self.player, self.current_attr)
+        max_value = getattr(self.player, self.max_attr)
+
+        if max_value <= 0:
+            return 0
+
+        return max(0, current / max_value)
+
+    def draw(self, screen):
+        # Background
+        pygame.draw.rect(
+            screen,
+            self.back_color,
+            self.rect,
+            border_radius=self.radius
+        )
+
+        # Filled
+        fill_width = int(self.rect.width * self.get_percent())
+
+        if fill_width > 0:
+            fill_rect = pygame.Rect(
+                self.rect.x,
+                self.rect.y,
+                fill_width,
+                self.rect.height
+            )
+
+            pygame.draw.rect(
+                screen,
+                self.color,
+                fill_rect,
+                border_radius=self.radius
+            )
+
+        # Border
+        pygame.draw.rect(
+            screen,
+            self.border_color,
+            self.rect,
+            self.border,
+            border_radius=self.radius
+        )
+

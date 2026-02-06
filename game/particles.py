@@ -9,7 +9,17 @@ gem_img = pygame.image.load("assets/particles/gem.png")
 MONEY_SPRITES = [coin_img, dollar_img,gem_img]
 
 class Particle:
-    def __init__(self, x, y, color, velocity, lifetime=1.0, size=4, gravity=0, sprite=None):
+    def __init__(
+        self,
+        x, y,
+        color,
+        velocity,
+        lifetime=1.0,
+        size=4,
+        gravity=0,
+        sprite=None,
+        is_smoke=False
+    ):
         self.x = x
         self.y = y
         self.color = color
@@ -19,6 +29,7 @@ class Particle:
         self.size = size
         self.gravity = gravity
         self.alpha = 255
+        self.is_smoke = is_smoke
 
         self.sprite = sprite
 
@@ -28,11 +39,17 @@ class Particle:
     def update(self, dt):
         self.x += self.vx * dt
         self.y += self.vy * dt
+
+        # Smoke slowly spreads
+        if self.is_smoke:
+            self.size += 6 * dt
+            self.vx += random.uniform(-5, 5) * dt
+
         self.vy += self.gravity * dt
         self.lifetime -= dt
 
-        if self.lifetime < self.max_lifetime * 0.5:
-            self.alpha = int(255 * (self.lifetime / (self.max_lifetime * 0.5)))
+        if self.lifetime < self.max_lifetime:
+            self.alpha = int(255 * (self.lifetime / self.max_lifetime))
 
         return self.lifetime > 0
 
@@ -81,6 +98,25 @@ class ParticleSystem:
                 size=random.randint(2, 4),
                 gravity=100
             )
+            self.particles.append(particle)
+    def add_smoke(self, x, y, count=2):
+        for _ in range(count):
+            vx = random.uniform(-10, 10)
+            vy = random.uniform(-40, -80)
+
+            gray = random.randint(160, 220)
+
+            particle = Particle(
+                x + random.randint(-2, 2),
+                y + random.randint(-2, 2),
+                (gray, gray, gray),
+                (vx, vy),
+                lifetime=random.uniform(0.8, 1.4),
+                size=random.randint(6, 10),
+                gravity=-10,
+                is_smoke=True
+            )
+
             self.particles.append(particle)
 
     def add_win_particles(self, x, y, amount, count=30):
