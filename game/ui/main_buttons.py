@@ -15,7 +15,7 @@ class MainMenuButtons:
         btn_y = screen_height - btn_height - padding
 
         # CHANGE THESE TWO VALUES TO MOVE THE WHOLE CLUSTER
-        self.cluster_x = 600
+        self.cluster_x = 500
         self.cluster_y = -100
 
         self.ticket_shop_btn = Button(
@@ -63,13 +63,24 @@ class MainMenuButtons:
 
         self.collect_btn.set_enabled(False)
 
+        self.pee_btn = Button(
+            375, 900,
+            120, btn_height-10,
+            "Go Piss",
+            color=(200, 180, 50), hover_color=(240, 220, 80),
+            font_size=28
+        )
+
+        self.pee_btn.set_enabled(False)
+
         self._buttons = [
             self.ticket_shop_btn,
             self.upgrades_btn,
             self.item_shop_btn,
             self.inventory_btn,
             self.ticket_inventory_btn,
-            self.collect_btn
+            self.collect_btn,
+            self.pee_btn
         ]
 
         # Apply cluster offset immediately
@@ -84,11 +95,15 @@ class MainMenuButtons:
             "collect": self.collect_btn.update(mouse_pos, mouse_clicked),
             "item_shop": self.item_shop_btn.update(mouse_pos, mouse_clicked),
             "inventory_screen": self.inventory_btn.update(mouse_pos, mouse_clicked),
-            "ticket_inventory": self.ticket_inventory_btn.update(mouse_pos, mouse_clicked)
+            "ticket_inventory": self.ticket_inventory_btn.update(mouse_pos, mouse_clicked),
+            "pee": self.pee_btn.update(mouse_pos, mouse_clicked)
         }
 
     def set_collect_enabled(self, enabled):
         self.collect_btn.set_enabled(enabled)
+
+    def set_pee_enabled(self, enabled):
+        self.pee_btn.set_enabled(enabled)
 
     def draw(self, screen):
         self.ticket_shop_btn.draw(screen)
@@ -99,3 +114,5 @@ class MainMenuButtons:
 
         if self.collect_btn.enabled:
             self.collect_btn.draw(screen)
+        if self.pee_btn.enabled:
+            self.pee_btn.draw(screen)

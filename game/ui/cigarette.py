@@ -75,7 +75,7 @@ class Cigarette:
             self.show_dot = not self.show_dot
             self.last_blink = now
 
-    def draw(self, screen):
+    def draw(self, screen, remaining=None, total=None):
         self.update_blink()
 
         image = self.smoking_image if self.is_smoking else self.idle_image
@@ -127,3 +127,25 @@ class Cigarette:
             )
 
         screen.blit(text_surface, text_rect)
+
+        # ----- TIMER BAR -----
+        if remaining is not None and total is not None and total > 0:
+            bar_width = self.frame_rect.width
+            bar_height = 6
+            bar_x = self.frame_rect.x
+            bar_y = text_rect.bottom + 4
+
+            # Background
+            bg_rect = pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+            pygame.draw.rect(screen, (40, 40, 40), bg_rect, border_radius=3)
+
+            # Fill (green → red as it depletes)
+            pct = max(0, remaining / total)
+            fill_w = int(bar_width * pct)
+            if fill_w > 0:
+                r = int(255 * (1 - pct))
+                g = int(200 * pct)
+                fill_rect = pygame.Rect(bar_x, bar_y, fill_w, bar_height)
+                pygame.draw.rect(screen, (r, g, 0), fill_rect, border_radius=3)
+
+            pygame.draw.rect(screen, (80, 80, 80), bg_rect, 1, border_radius=3)

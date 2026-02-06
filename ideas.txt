@@ -7,8 +7,10 @@ various events good or bad over the phone or possibly use phone
 as distraction in gameplay.
 
 Drinking alcohol increases morale but messes your vision up make
-drunk effect on screen
+drunk effect on screen   --- ADDED
 
-add cigarettes
+add cigarettes -- ADDED
 
-add xp
+add xp -- ADDED
+
+pee meter with minigame????

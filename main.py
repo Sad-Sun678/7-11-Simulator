@@ -3,14 +3,15 @@ import sys
 import random
 import math
 
-from game.config import TICKET_TYPES, UPGRADES, ITEMS
+from game.config import TICKET_TYPES, UPGRADES, ITEMS, LEVEL_CONFIG, PEE_CONFIG
 from game.ticket import ScratchTicket, create_ticket
 from game.player import Player
 from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
                      MainMenuButtons, AutoCollectTimer, ItemShopPopup, InventoryPopup,
-                     StatBar, Cigarette, TicketInventoryPopup)
+                     StatBar, Cigarette, TicketInventoryPopup, PeeCam)
 from game.effects import DrunkEffect
 from game.particles import ParticleSystem, ScreenShake
+from game.pee_minigame import PeeMinigame
 
 # Initialize Pygame
 pygame.init()
@@ -61,6 +62,9 @@ class Game:
         self.auto_collect_timer_ui = AutoCollectTimer()
         self.hunger_bar = StatBar(self.player,50,50,200,25,("current_hunger","max_hunger"))
         self.morale_bar = StatBar(self.player,50,80,200,25,("morale","morale_cap"),color=(0,76,153))
+        self.xp_bar = StatBar(self.player,50,110,200,25,("current_xp","xp_to_next_level"),color=(180,140,50))
+        self.pee_bar = StatBar(self.player,50,140,200,25,("current_bladder","max_bladder"),color=(255,255,0))
+        self.level_font = pygame.font.Font(None, 22)
         # Effects
         self.particles = ParticleSystem()
         self.screen_shake = ScreenShake()
@@ -78,12 +82,28 @@ class Game:
             particle_system=self.particles
         )
 
+        # Pee minigame
+        self.pee_minigame = PeeMinigame(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.pee_minigame_active = False
+
+        # Pee accident cam (plays when bladder full for too long)
+        self.pee_cam = PeeCam(
+            "assets/animation/pee_cam_spritesheet.png",
+            x=50, y=420,
+            frame_size=128,
+            scale=2.0,
+            animation_speed=0.5
+        )
+        self.pee_accident_timer = 0.0  # counts up while bladder is full
+        self.pee_accident_active = False
+
         # State
         self.scratching = False
         self.pending_prize = 0
         self.auto_scratch_timer = 0
         self.auto_collect_timer = 0
         self.auto_collect_total_time = None
+        self.game_lost = False
 
         # Track mouse state for click detection
         self.mouse_was_pressed = False
@@ -99,16 +119,6 @@ class Game:
         bg_image = pygame.image.load("assets/background/temp_bg.png").convert()
         bg = pygame.transform.scale(bg_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
-        # -----------------------
-        # KEEP EVERYTHING BELOW
-        # -----------------------
-
-        # Main counter area (STATIC)
-        # counter_rect = pygame.Rect(50, 80, SCREEN_WIDTH - 100, SCREEN_HEIGHT - 180)
-        # pygame.draw.rect(bg, COUNTER_COLOR, counter_rect, border_radius=20)
-        # pygame.draw.rect(bg, (75, 80, 90), counter_rect, 4, border_radius=20)
-
-        # Create SCRATCH MAT as separate surface
         mat_w = SCREEN_WIDTH // 2
         mat_h = SCREEN_HEIGHT // 2
 
@@ -178,6 +188,10 @@ class Game:
                 self.particles.add_scratch_particles(
                     result["x"], result["y"], result["color"], count=3
                 )
+                # XP only when actually revealing new area
+                if result.get("new_reveal"):
+                    if self.player.gain_xp(LEVEL_CONFIG["xp_sources"]["scratch_per_cell"]):
+                        self.messages.add_message(f"LEVEL UP! Lv.{self.player.player_level}", (255, 255, 100))
 
             if self.current_ticket.is_complete():
                 self._handle_ticket_complete()
@@ -191,6 +205,13 @@ class Game:
         # Reset auto-collect timer
         self.auto_collect_timer = 0
         self.auto_collect_total_time = self.player.get_auto_collect_delay()
+
+        # XP for completing a ticket
+        leveled = self.player.gain_xp(LEVEL_CONFIG["xp_sources"]["ticket_complete"])
+        if prize > 0:
+            leveled = self.player.gain_xp(LEVEL_CONFIG["xp_sources"]["winner_bonus"]) or leveled
+        if leveled:
+            self.messages.add_message(f"LEVEL UP! Lv.{self.player.player_level}", (255, 255, 100))
 
         if prize > 0:
             self.messages.add_message(f"WIN ${prize}!", (100, 255, 100), flag="WIN_PRIZE")
@@ -333,7 +354,11 @@ class Game:
 
         if self.auto_collect_timer >= delay:
             self.collect_winnings()
-
+    def check_for_lose_condition(self):
+        if self.player.morale <= 0:
+            self.game_lost = True
+        else:
+            return
     def update(self, dt):
         """Update game state."""
         mouse_pos = pygame.mouse.get_pos()
@@ -341,6 +366,24 @@ class Game:
 
         # Detect click (mouse down this frame, wasn't down last frame)
         mouse_clicked = mouse_pressed and not self.mouse_was_pressed
+
+        # Pee minigame takes over entirely
+        if self.pee_minigame_active:
+            result = self.pee_minigame.update(pygame.key.get_pressed(), dt)
+            if result is not None:
+                accuracy = result["accuracy"]
+                xp_reward = int(accuracy * PEE_CONFIG["xp_per_accuracy_point"])
+                self.player.current_bladder = 0
+                if xp_reward > 0:
+                    if self.player.gain_xp(xp_reward):
+                        self.messages.add_message(f"LEVEL UP! Lv.{self.player.player_level}", (255, 255, 100))
+                    self.messages.add_message(f"Relief! {accuracy:.0f}% accuracy (+{xp_reward} XP)", (100, 255, 200))
+                else:
+                    self.messages.add_message("Relief!", (100, 255, 200))
+                self.pee_minigame_active = False
+                self.player.save_game()
+            self.mouse_was_pressed = mouse_pressed
+            return
 
         # Check if any popup is open
         popup_open = self.ticket_shop.is_open or self.upgrade_shop.is_open
@@ -371,6 +414,8 @@ class Game:
                     self.item_shop.setup_buttons(ITEMS,self.player)
         elif  self.inventory_screen.is_open:
             used_item = self.inventory_screen.update(mouse_pos,mouse_clicked,self.player)
+            print(used_item)
+
             if used_item:
                 if self.player.try_use_item(used_item):
                     self.player.consume_item(used_item)
@@ -413,6 +458,9 @@ class Game:
                     self.ticket_inventory.open()
             elif button_clicks["collect"]:
                 self.collect_winnings()
+            elif button_clicks["pee"]:
+                self.pee_minigame.start(self.player)
+                self.pee_minigame_active = True
 
             # Update collect button state
             if self.current_ticket and self.current_ticket.is_complete():
@@ -426,7 +474,34 @@ class Game:
         self.player.decay_active_effects(dt)
         self.player.drain_hunger(dt)
         self.player.passive_morale_drain(dt)
+        self.player.fill_bladder(dt)
 
+        # Show PEE button when bladder is full
+        bladder_full = self.player.current_bladder >= self.player.max_bladder
+        self.main_buttons.set_pee_enabled(bladder_full)
+
+        # Pee accident timer — if bladder stays full for 5s, trigger accident
+        if bladder_full and not self.pee_minigame_active and not self.pee_accident_active:
+            self.pee_accident_timer += dt
+            if self.pee_accident_timer >= 5.0:
+                self.pee_accident_active = True
+                self.pee_cam.start()
+                self.pee_accident_timer = 0.0
+        elif not bladder_full:
+            self.pee_accident_timer = 0.0
+
+        # Update pee accident animation
+        if self.pee_accident_active:
+            anim_done = self.pee_cam.update(dt)
+            if anim_done:
+                # Animation finished — set game over, drain bladder
+                self.game_lost = True
+                self.player.current_bladder = 0
+                self.pee_accident_active = False
+                self.pee_cam.stop()
+                self.messages.add_message("You peed yourself!", (255, 80, 80))
+
+        self.check_for_lose_condition()
         # Drive drunk visuals from active effects
         drunk_active = self.player.active_effects.get("drunk", 0) > 0
 
@@ -442,6 +517,10 @@ class Game:
             if hasattr(self.drunk, "ghost_cache"):
                 self.drunk.ghost_cache.clear()  # optional: rebuild caches next time
 
+        # Stop cigarette if smoking effect expired
+        if not self.player.has_effect("smoking"):
+            self.cigarette.stop_smoking()
+
         # Update effects
         self.particles.update(dt)
         self.screen_shake.update(dt)
@@ -453,6 +532,12 @@ class Game:
 
     def draw(self):
         """Draw the game."""
+        # Pee minigame takes over the screen
+        if self.pee_minigame_active:
+            self.pee_minigame.draw(self.screen)
+            pygame.display.flip()
+            return
+
         shake_offset = self.screen_shake.get_offset()
         drunk_offset = self.drunk.get_offset()
 
@@ -531,6 +616,12 @@ class Game:
 
         # Draw Hunger Bar
         self.hunger_bar.draw(self.screen)
+        # Draw XP Bar
+        self.xp_bar.draw(self.screen)
+        lvl_text = self.level_font.render(f"LVL {self.player.player_level}", True, (220, 200, 120))
+        self.screen.blit(lvl_text, (255, 115))
+        # Draw Pee Bar
+        self.pee_bar.draw(self.screen)
         # Draw main buttons
         self.main_buttons.draw(self.screen)
 
@@ -539,7 +630,13 @@ class Game:
 
         # Draw messages
         self.messages.draw(self.screen, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        self.cigarette.draw(self.screen)
+        if self.player.has_effect("smoking"):
+            remaining = self.player.active_effects.get("smoking", 0)
+            self.cigarette.draw(self.screen, remaining=remaining, total=45)
+
+        # Draw pee accident cam
+        if self.pee_accident_active or self.pee_cam.finished:
+            self.pee_cam.draw(self.screen)
 
         # Draw popup menus (on top of everything)
         self.ticket_shop.draw(self.screen)
@@ -570,8 +667,12 @@ class Game:
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
+                        # Cancel pee minigame first
+                        if self.pee_minigame_active:
+                            self.pee_minigame.cancel()
+                            self.pee_minigame_active = False
                         # Close popups first, then exit
-                        if self.ticket_shop.is_open:
+                        elif self.ticket_shop.is_open:
                             self.ticket_shop.close()
                         elif self.upgrade_shop.is_open:
                             self.upgrade_shop.close()
@@ -599,10 +700,15 @@ class Game:
 
                 keys = pygame.key.get_pressed()
 
-                if keys[pygame.K_SPACE]:
+                if self.player.has_effect("smoking") and keys[pygame.K_SPACE]:
                     self.cigarette.start_smoking()
                     if self.player.morale < self.player.morale_cap:
                         self.player.morale += 15 * dt  # morale gain while smoking
+                    # XP from smoking
+                    if self.player.gain_xp(LEVEL_CONFIG["xp_sources"]["smoking_per_second"] * dt):
+                        self.messages.add_message(f"LEVEL UP! Lv.{self.player.player_level}", (255, 255, 100))
+                    # Drain cigarette faster while actively puffing
+                    self.player.active_effects["smoking"] -= dt * 1.5
                 else:
                     self.cigarette.stop_smoking()
 

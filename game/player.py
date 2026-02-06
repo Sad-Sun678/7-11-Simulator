@@ -1,7 +1,7 @@
 import json
 import os
 
-from game.config import UPGRADES, ITEMS
+from game.config import UPGRADES, ITEMS, LEVEL_CONFIG, PEE_CONFIG
 
 
 class Inventory:
@@ -17,7 +17,7 @@ class Inventory:
     def setup_inventory(self):
         """Loops through every item and sets item amounts to 0"""
         for key, config in self.all_game_items.items():
-            self.items_in_inventory[config['name'].lower()] = 0
+            self.items_in_inventory[key] = 0
 
 
 class Player:
@@ -30,9 +30,13 @@ class Player:
         self.morale = 100
         self.morale_cap = 100
         self.player_level = 1
+        self.current_xp = 0
+        self.xp_to_next_level = LEVEL_CONFIG["xp_base"]
         self.max_hunger = 100
         self.current_hunger = 100
         self.hunger_decay_rate = 4.0  # hunger drain per second
+        self.max_bladder = PEE_CONFIG["max_bladder"]
+        self.current_bladder = 0
         self.active_effects = {}
         self.inventory = Inventory()
 
@@ -46,10 +50,11 @@ class Player:
         self.load_game()
 
     def get_luck_bonus(self):
-        """Get the luck bonus from upgrades and active effects."""
+        """Get the luck bonus from upgrades, active effects, and player level."""
         lucky_time = self.active_effects.get("lucky", 0)  # 0 if not present
         luck_bonus = 5 if lucky_time > 0 else 0
-        return self.upgrades["lucky_charm"] + luck_bonus
+        level_bonus = (self.player_level - 1) * LEVEL_CONFIG["rewards_per_level"]["luck_bonus"]
+        return int(self.upgrades["lucky_charm"] + luck_bonus + level_bonus)
 
     def drain_hunger(self, dt):
         """Drain hunger over time (dt-based)."""
@@ -61,11 +66,49 @@ class Player:
         """Fill hunger by an amount"""
         self.current_hunger += amount
 
+    def fill_bladder(self, dt):
+        """Fill bladder over time (dt-based)."""
+        self.current_bladder += PEE_CONFIG["bladder_fill_rate"] * dt
+        if self.current_bladder > self.max_bladder:
+            self.current_bladder = self.max_bladder
+
+    def drain_bladder(self, amount):
+        """Drain bladder by amount."""
+        self.current_bladder -= amount
+        if self.current_bladder < 0:
+            self.current_bladder = 0
+
     def get_scratch_radius(self):
-        """Get scratch radius based on upgrade level."""
+        """Get scratch radius based on upgrade level and player level."""
         base_radius = 20
         bonus = self.upgrades["scratch_speed"] * 5
-        return base_radius + bonus
+        level_bonus = (self.player_level - 1) * LEVEL_CONFIG["rewards_per_level"]["scratch_radius_bonus"]
+        return int(base_radius + bonus + level_bonus)
+
+    def gain_xp(self, amount):
+        """Add XP and level up if threshold is met. Returns True if leveled up."""
+        if self.player_level >= LEVEL_CONFIG["max_level"]:
+            return False
+
+        self.current_xp += amount
+        leveled_up = False
+
+        while self.current_xp >= self.xp_to_next_level and self.player_level < LEVEL_CONFIG["max_level"]:
+            self._level_up()
+            leveled_up = True
+
+        return leveled_up
+
+    def _level_up(self):
+        """Increment level, apply morale cap bonus, recalculate XP threshold."""
+        self.current_xp -= self.xp_to_next_level
+        self.player_level += 1
+        self.morale_cap += LEVEL_CONFIG["rewards_per_level"]["morale_cap_bonus"]
+        self.xp_to_next_level = self._calc_xp_for_level(self.player_level)
+
+    def _calc_xp_for_level(self, level):
+        """Return XP needed to go from `level` to `level + 1`."""
+        return int(LEVEL_CONFIG["xp_base"] * (LEVEL_CONFIG["xp_growth"] ** (level - 1)))
 
     def get_auto_scratch_speed(self):
         """Get auto-scratch speed (scratches per second)."""
@@ -136,13 +179,7 @@ class Player:
 
     def try_use_item(self, item_key):
         """Looks to see if player has item in inventory."""
-        result = None
-        for item, amount in self.inventory.items_in_inventory.items():
-            if item == item_key:
-                result = True
-            else:
-                result = False
-        return result
+        return self.inventory.items_in_inventory.get(item_key, 0) > 0
 
     def consume_item(self, item_key, amount=1):
         """Removes item from inventory and applies its effects."""
@@ -166,6 +203,8 @@ class Player:
             self.active_effects["lucky"] = 30
         elif effect == "drunk":
             self.active_effects["drunk"] = 30
+        elif effect == "smoking":
+            self.active_effects["smoking"] = 45
 
     def has_effect(self, name: str) -> bool:
         """Return active effects."""
@@ -239,7 +278,10 @@ class Player:
             "tickets_scratched": self.tickets_scratched,
             "biggest_win": self.biggest_win,
             "upgrades": self.upgrades,
-            "items": self.inventory.items_in_inventory
+            "items": self.inventory.items_in_inventory,
+            "player_level": self.player_level,
+            "current_xp": self.current_xp,
+            "current_bladder": self.current_bladder,
         }
         try:
             with open(self.save_file, "w") as f:
@@ -271,6 +313,16 @@ class Player:
             for key in ITEMS:
                 self.inventory.items_in_inventory[key] = saved_items.get(key, 0)
 
+            # Load XP / level
+            self.player_level = data.get("player_level", 1)
+            self.current_xp = data.get("current_xp", 0)
+            self.xp_to_next_level = self._calc_xp_for_level(self.player_level)
+            # Restore morale cap bonus from levels
+            self.morale_cap = 100 + (self.player_level - 1) * LEVEL_CONFIG["rewards_per_level"]["morale_cap_bonus"]
+
+            # Load bladder
+            self.current_bladder = data.get("current_bladder", 0)
+
         except Exception as e:
             pass
 
@@ -282,4 +334,9 @@ class Player:
         self.tickets_scratched = 0
         self.biggest_win = 0
         self.upgrades = {key: 0 for key in UPGRADES}
+        self.player_level = 1
+        self.current_xp = 0
+        self.xp_to_next_level = LEVEL_CONFIG["xp_base"]
+        self.morale_cap = 100
+        self.current_bladder = 0
         self.save_game()

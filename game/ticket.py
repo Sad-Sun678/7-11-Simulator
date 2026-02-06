@@ -117,6 +117,8 @@ class ScratchTicket:
 
         # Check if within ticket bounds
         if 0 <= local_x < self.width and 0 <= local_y < self.height:
+            old_percent = self.scratch_percent
+
             # Remove scratch material (make transparent)
             pygame.draw.circle(self.scratch_surface, (0, 0, 0, 0), (local_x, local_y), radius)
 
@@ -134,7 +136,8 @@ class ScratchTicket:
             return {
                 "x": mouse_x,
                 "y": mouse_y,
-                "color": self.config["scratch_color"]
+                "color": self.config["scratch_color"],
+                "new_reveal": self.scratch_percent > old_percent
             }
         return None
 
@@ -433,6 +436,8 @@ class Match3Ticket:
         local_y = mouse_y - self.y
 
         if 0 <= local_x < self.width and 0 <= local_y < self.height:
+            old_revealed = sum(self.cells_revealed)
+
             pygame.draw.circle(self.scratch_surface, (0, 0, 0, 0), (local_x, local_y), radius)
 
             for _ in range(3):
@@ -447,7 +452,8 @@ class Match3Ticket:
             return {
                 "x": mouse_x,
                 "y": mouse_y,
-                "color": self.config["scratch_color"]
+                "color": self.config["scratch_color"],
+                "new_reveal": sum(self.cells_revealed) > old_revealed
             }
         return None
 

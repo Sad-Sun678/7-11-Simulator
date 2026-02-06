@@ -1,3 +1,12 @@
+
+
+
+
+
+
+
+
+
 import pygame
 
 # Symbol definitions for Match 3 tickets
@@ -181,5 +190,42 @@ ITEMS = {
         "base_cost": 10,
         "unlock_level": 1,
         "effects": ["drunk", "lucky"],
+    },
+    "cigarette": {
+        "name": "Cigarette",
+        "description": "Light up a smoke. Hold SPACE to puff.",
+        "base_cost": 5,
+        "unlock_level": 1,
+        "effects": ["smoking"],
     }
+}
+
+# Level / XP configuration
+LEVEL_CONFIG = {
+    "xp_base": 100,            # XP needed for level 2
+    "xp_growth": 1.6,          # Each level requires 1.6x more XP than the last
+    "max_level": 50,
+    "xp_sources": {
+        "smoking_per_second": 2,    # XP/sec while holding SPACE
+        "scratch_per_cell": 2,      # XP per new area scratched
+        "ticket_complete": 25,      # XP for completing any ticket
+        "winner_bonus": 50,         # Extra XP for winning tickets
+    },
+    "rewards_per_level": {
+        "luck_bonus": 0.5,          # +0.5 luck per level
+        "morale_cap_bonus": 2,      # +2 morale cap per level
+        "scratch_radius_bonus": 0.3 # +0.3 scratch radius per level
+    }
+}
+
+# Pee minigame configuration
+PEE_CONFIG = {
+    "max_bladder": 100,
+    "bladder_fill_rate": 5,       # per second (full in ~50s)
+    "pee_drain_rate": 15.0,         # bladder drain per second WHILE hitting bowl
+    "stream_radius": 8,             # visual pee stream radius
+    "bowl_x": 920,                  # bowl center X (adjust to match your toilet_bg)
+    "bowl_y": 520,                  # bowl center Y (adjust to match your toilet_bg)
+    "bowl_radius": 80,              # circular hitbox radius
+    "xp_per_accuracy_point": 1.0,   # XP = accuracy% * this (100% accuracy = 100 XP)
 }
