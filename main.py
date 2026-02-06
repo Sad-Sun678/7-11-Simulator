@@ -3,11 +3,13 @@ import sys
 import random
 import math
 
-from game.ticket import ScratchTicket, TICKET_TYPES, create_ticket
-from game.player import Player, UPGRADES, ITEMS
+from game.config import TICKET_TYPES, UPGRADES, ITEMS
+from game.ticket import ScratchTicket, create_ticket
+from game.player import Player
 from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
-                     MainMenuButtons, AutoCollectTimer, DrunkEffect, ItemShopPopup, InventoryPopup,
-                     StatBar,Cigarette)
+                     MainMenuButtons, AutoCollectTimer, ItemShopPopup, InventoryPopup,
+                     StatBar, Cigarette)
+from game.effects import DrunkEffect
 from game.particles import ParticleSystem, ScreenShake
 
 # Initialize Pygame
