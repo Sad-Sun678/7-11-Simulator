@@ -8,7 +8,7 @@ from game.ticket import ScratchTicket, create_ticket
 from game.player import Player
 from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
                      MainMenuButtons, AutoCollectTimer, ItemShopPopup, InventoryPopup,
-                     StatBar, Cigarette)
+                     StatBar, Cigarette, TicketInventoryPopup)
 from game.effects import DrunkEffect
 from game.particles import ParticleSystem, ScreenShake
 
@@ -47,6 +47,9 @@ class Game:
         self.item_shop = ItemShopPopup(SCREEN_WIDTH, SCREEN_HEIGHT)
 
         self.inventory_screen = InventoryPopup(SCREEN_WIDTH,SCREEN_HEIGHT)
+
+        self.ticket_inventory = TicketInventoryPopup(SCREEN_WIDTH, SCREEN_HEIGHT)
+
         # Main screen buttons
         self.main_buttons = MainMenuButtons(SCREEN_WIDTH, SCREEN_HEIGHT)
         # move the cluster over
@@ -240,6 +243,9 @@ class Game:
         else:
             self.messages.add_message("Try again!", (255, 150, 100), flag="TRY_AGAIN")
             self.player.lose_morale(5)
+            # Loser ticket — auto-collect immediately, no need to prompt the player
+            self.collect_winnings()
+            return
 
         self.main_buttons.set_collect_enabled(True)
 
@@ -263,6 +269,38 @@ class Game:
 
         # Update shop buttons for unlocks
         self.ticket_shop.setup_buttons(TICKET_TYPES, self.player.get_unlocked_tickets())
+
+    def _switch_to_ticket(self, ticket):
+        """Switch the active ticket to the selected one from inventory."""
+        # If the selected ticket IS already current, do nothing
+        if ticket is self.current_ticket:
+            return
+
+        # If current ticket is complete and has uncollected winnings, block
+        if self.current_ticket and self.current_ticket.is_complete() and self.pending_prize > 0:
+            self.messages.add_message("Collect winnings first!", (255, 200, 100))
+            return
+
+        # If current ticket is complete with $0 prize (loser), discard it
+        if self.current_ticket and self.current_ticket.is_complete() and self.pending_prize == 0:
+            pass  # Don't put it back in queue - it's done
+        elif self.current_ticket is not None:
+            # Current ticket not complete - put it back in the queue
+            self.ticket_queue.append(self.current_ticket)
+
+        # Remove the selected ticket from queue
+        if ticket in self.ticket_queue:
+            self.ticket_queue.remove(ticket)
+
+        # Make it current
+        self.current_ticket = ticket
+        self.pending_prize = 0
+        self.auto_collect_timer = 0
+        self.auto_collect_total_time = None
+
+        # If the newly-switched ticket is already complete, handle it
+        if self.current_ticket.is_complete():
+            self._handle_ticket_complete()
 
     def auto_scratch(self, dt):
         """Handle auto-scratching if upgrade is purchased."""
@@ -334,11 +372,18 @@ class Game:
         elif  self.inventory_screen.is_open:
             used_item = self.inventory_screen.update(mouse_pos,mouse_clicked,self.player)
             if used_item:
-                print(used_item)
                 if self.player.try_use_item(used_item):
                     self.player.consume_item(used_item)
                     self.messages.add_message(f"{used_item.title()} Consumed!")
-                    print(f"active effects:{self.player.active_effects.items()}")
+
+        elif self.ticket_inventory.is_open:
+            selected_ticket = self.ticket_inventory.update(
+                mouse_pos, mouse_clicked,
+                self.current_ticket, self.ticket_queue
+            )
+            if selected_ticket is not None:
+                self._switch_to_ticket(selected_ticket)
+                self.ticket_inventory.close()
 
         else:
             # No popup open - handle main game
@@ -362,6 +407,10 @@ class Game:
             elif button_clicks["inventory_screen"]:
                 self.inventory_screen.setup_buttons(self.player)
                 self.inventory_screen.open()
+            elif button_clicks["ticket_inventory"]:
+                if self.current_ticket is not None or self.ticket_queue:
+                    self.ticket_inventory.setup_buttons(self.current_ticket, self.ticket_queue)
+                    self.ticket_inventory.open()
             elif button_clicks["collect"]:
                 self.collect_winnings()
 
@@ -497,6 +546,7 @@ class Game:
         self.upgrade_shop.draw(self.screen)
         self.item_shop.draw(self.screen)
         self.inventory_screen.draw(self.screen)
+        self.ticket_inventory.draw(self.screen)
 
         pygame.display.flip()
 
@@ -515,6 +565,8 @@ class Game:
                         self.ticket_shop.handle_scroll(event.y)
                     if self.item_shop.is_in_scroll_area(pygame.mouse.get_pos()):
                         self.item_shop.handle_scroll(event.y)
+                    if self.ticket_inventory.is_in_scroll_area(pygame.mouse.get_pos()):
+                        self.ticket_inventory.handle_scroll(event.y)
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
@@ -525,6 +577,8 @@ class Game:
                             self.upgrade_shop.close()
                         elif self.inventory_screen.is_open:
                             self.inventory_screen.close()
+                        elif self.ticket_inventory.is_open:
+                            self.ticket_inventory.close()
 
                         else:
                             self.running = False

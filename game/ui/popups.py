@@ -518,3 +518,133 @@ class InventoryPopup(PopupMenu):
         screen.set_clip(None)
 
         self.draw_scrollbar(screen)
+
+
+class TicketInventoryPopup(PopupMenu):
+    """Popup menu for viewing and selecting purchased tickets."""
+
+    def __init__(self, screen_width, screen_height):
+        super().__init__(
+            screen_width, screen_height,
+            550, 500,
+            "MY TICKETS",
+            (50, 40, 60), (120, 80, 140)
+        )
+        self.ticket_buttons = {}
+        self.ticket_refs = {}
+        self.scroll_offset = 0
+
+    def setup_buttons(self, current_ticket, ticket_queue):
+        """Build buttons from current_ticket + ticket_queue."""
+        self.ticket_buttons = {}
+        self.ticket_refs = {}
+
+        # Build unified list: current ticket first (marked), then queue
+        all_tickets = []
+        if current_ticket is not None:
+            all_tickets.append((current_ticket, True))
+        for t in ticket_queue:
+            all_tickets.append((t, False))
+
+        y_pos = self.y + 70
+        for i, (ticket, is_current) in enumerate(all_tickets):
+            label = self._ticket_label(ticket, is_current)
+            color = self._ticket_button_color(ticket, is_current)
+
+            btn = Button(
+                self.x + 20, y_pos,
+                self.width - 40, 60,
+                label,
+                color=color,
+                font_size=20
+            )
+            btn.base_y = y_pos
+
+            # Current ticket is already active, disable clicking
+            if is_current:
+                btn.set_enabled(False)
+
+            self.ticket_buttons[i] = btn
+            self.ticket_refs[i] = ticket
+            y_pos += 70
+
+        self.content_height = len(self.ticket_buttons) * 70
+        self.max_scroll = max(0, self.content_height - self.scroll_area_height)
+
+    def _ticket_label(self, ticket, is_current):
+        """Build display string for a ticket button."""
+        config = ticket.config
+        name = config["name"]
+
+        # Determine scratch status
+        if ticket.is_complete():
+            status = "DONE - Collect!"
+        elif hasattr(ticket, 'cells_revealed'):
+            # Match3 ticket
+            revealed = ticket.get_cells_revealed_count()
+            status = f"{revealed}/9 revealed"
+        elif ticket.scratched:
+            pct = int(ticket.scratch_percent * 100)
+            status = f"{pct}% scratched"
+        else:
+            status = "Unscratched"
+
+        prefix = "[ACTIVE] " if is_current else ""
+        return f"{prefix}{name} - {status}"
+
+    def _ticket_button_color(self, ticket, is_current):
+        """Get button color based on ticket state."""
+        if is_current:
+            return (80, 80, 50)
+        elif ticket.is_complete():
+            return (60, 120, 60)
+        elif ticket.scratched:
+            return (100, 80, 60)
+        else:
+            r, g, b = ticket.config["color"]
+            return (max(0, r - 40), max(0, g - 40), max(0, b - 40))
+
+    def update(self, mouse_pos, mouse_clicked, current_ticket, ticket_queue):
+        """Update popup. Returns clicked ticket object or None."""
+        if not self.is_open:
+            return None
+
+        super().update(mouse_pos, mouse_clicked)
+
+        clicked_ticket = None
+        for i, btn in self.ticket_buttons.items():
+            if btn.update(mouse_pos, mouse_clicked):
+                clicked_ticket = self.ticket_refs[i]
+
+        return clicked_ticket
+
+    def draw(self, screen):
+        if not self.is_open:
+            return
+
+        self.draw_base(screen)
+
+        # Subtitle
+        subtitle_font = pygame.font.Font(None, 24)
+        count = len(self.ticket_refs)
+        subtitle = subtitle_font.render(
+            f"Click a ticket to switch to it! ({count} ticket{'s' if count != 1 else ''})",
+            True, (200, 200, 255)
+        )
+        screen.blit(subtitle, (self.x + 20, self.y + 50))
+
+        # Clipped scroll area
+        clip_rect = pygame.Rect(
+            self.x,
+            self.scroll_area_top,
+            self.width,
+            self.scroll_area_height
+        )
+        screen.set_clip(clip_rect)
+
+        for i, btn in self.ticket_buttons.items():
+            btn.rect.y = btn.base_y - self.scroll_offset
+            btn.draw(screen)
+
+        screen.set_clip(None)
+        self.draw_scrollbar(screen)

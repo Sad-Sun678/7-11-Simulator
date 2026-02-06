@@ -46,6 +46,13 @@ class MainMenuButtons:
             color=(204, 204, 0), hover_color=(255, 255, 0), font_size=28
         )
 
+        self.ticket_inventory_btn = Button(
+            padding + btn_width + 520, btn_y,
+            btn_width, btn_height,
+            "MY TICKETS",
+            color=(120, 60, 140), hover_color=(160, 80, 180), font_size=24
+        )
+
         self.collect_btn = Button(
             padding + btn_width + 115, btn_y - 70,
             150, btn_height-10,
@@ -61,6 +68,7 @@ class MainMenuButtons:
             self.upgrades_btn,
             self.item_shop_btn,
             self.inventory_btn,
+            self.ticket_inventory_btn,
             self.collect_btn
         ]
 
@@ -75,7 +83,8 @@ class MainMenuButtons:
             "upgrades": self.upgrades_btn.update(mouse_pos, mouse_clicked),
             "collect": self.collect_btn.update(mouse_pos, mouse_clicked),
             "item_shop": self.item_shop_btn.update(mouse_pos, mouse_clicked),
-            "inventory_screen": self.inventory_btn.update(mouse_pos, mouse_clicked)
+            "inventory_screen": self.inventory_btn.update(mouse_pos, mouse_clicked),
+            "ticket_inventory": self.ticket_inventory_btn.update(mouse_pos, mouse_clicked)
         }
 
     def set_collect_enabled(self, enabled):
@@ -86,6 +95,7 @@ class MainMenuButtons:
         self.upgrades_btn.draw(screen)
         self.item_shop_btn.draw(screen)
         self.inventory_btn.draw(screen)
+        self.ticket_inventory_btn.draw(screen)
 
         if self.collect_btn.enabled:
             self.collect_btn.draw(screen)
