@@ -684,7 +684,8 @@ class SideMenuManager:
             status = "DONE - Collect!"
         elif hasattr(ticket, 'cells_revealed'):
             revealed = ticket.get_cells_revealed_count()
-            status = f"{revealed}/9 revealed"
+            total = len(ticket.cells_revealed)
+            status = f"{revealed}/{total} revealed"
         elif ticket.scratched:
             pct = int(ticket.scratch_percent * 100)
             status = f"{pct}% scratched"

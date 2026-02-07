@@ -3,7 +3,7 @@ import sys
 import random
 import math
 
-from game.config import TICKET_TYPES, UPGRADES, ITEMS, LEVEL_CONFIG, PEE_CONFIG, load_symbol_images
+from game.config import TICKET_TYPES, UPGRADES, ITEMS, LEVEL_CONFIG, PEE_CONFIG, load_symbol_images, load_ticket_images
 from game.ticket import ScratchTicket, create_ticket
 from game.player import Player
 from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
@@ -37,6 +37,7 @@ class Game:
 
         # Load images now that display exists
         load_symbol_images()
+        load_ticket_images()
 
         # Game objects
         self.player = Player()

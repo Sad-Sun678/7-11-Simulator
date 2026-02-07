@@ -2,7 +2,7 @@ import pygame
 import random
 import math
 
-from game.config import SYMBOLS, SYMBOL_IMAGES, TICKET_TYPES
+from game.config import SYMBOLS, SYMBOL_IMAGES, TICKET_TYPES, TICKET_IMAGES
 
 
 class ScratchTicket:
@@ -45,19 +45,26 @@ class ScratchTicket:
         return prizes[index]
 
     def _create_surfaces(self):
-        # Base ticket surface (what's underneath)
+        # Base ticket surface (custom PNG or fallback procedural)
         self.base_surface = pygame.Surface((self.width, self.height))
-        self.base_surface.fill(self.config["color"])
 
-        # Draw ticket border and design
-        pygame.draw.rect(self.base_surface, (255, 255, 255),
-                        (0, 0, self.width, self.height), 4, border_radius=10)
+        base_img_name = self.config.get("base_image")
+        if base_img_name and base_img_name in TICKET_IMAGES:
+            scaled = pygame.transform.scale(TICKET_IMAGES[base_img_name],
+                                            (self.width, self.height))
+            self.base_surface.blit(scaled, (0, 0))
+        else:
+            self.base_surface.fill(self.config["color"])
 
-        # Draw ticket name at top
-        font = pygame.font.Font(None, 28)
-        name_text = font.render(self.config["name"], True, (255, 255, 255))
-        name_rect = name_text.get_rect(centerx=self.width//2, y=10)
-        self.base_surface.blit(name_text, name_rect)
+            # Draw ticket border and design
+            pygame.draw.rect(self.base_surface, (255, 255, 255),
+                            (0, 0, self.width, self.height), 4, border_radius=10)
+
+            # Draw ticket name at top
+            font = pygame.font.Font(None, 28)
+            name_text = font.render(self.config["name"], True, (255, 255, 255))
+            name_rect = name_text.get_rect(centerx=self.width//2, y=10)
+            self.base_surface.blit(name_text, name_rect)
 
         # Draw prize reveal area
         prize_area = pygame.Rect(30, 50, self.width - 60, self.height - 80)
@@ -76,23 +83,30 @@ class ScratchTicket:
         # Draw decorative symbols
         self._draw_decorations()
 
-        # Scratch layer (gray covering)
+        # Scratch layer (custom PNG or fallback solid color)
         self.scratch_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        self.scratch_surface.fill((*self.config["scratch_color"], 255))
 
-        # Draw "SCRATCH HERE" text on scratch layer
-        scratch_font = pygame.font.Font(None, 36)
-        scratch_text = scratch_font.render("SCRATCH HERE!", True, (100, 100, 100))
-        scratch_rect = scratch_text.get_rect(center=(self.width//2, self.height//2))
-        self.scratch_surface.blit(scratch_text, scratch_rect)
+        scratch_img_name = self.config.get("scratch_image")
+        if scratch_img_name and scratch_img_name in TICKET_IMAGES:
+            # Use custom pixel-art cover scaled to ticket size
+            scaled = pygame.transform.scale(TICKET_IMAGES[scratch_img_name],
+                                            (self.width, self.height))
+            self.scratch_surface.blit(scaled, (0, 0))
+        else:
+            # Fallback: solid scratch color with texture
+            self.scratch_surface.fill((*self.config["scratch_color"], 255))
 
-        # Add some texture to scratch surface
-        for _ in range(50):
-            x = random.randint(0, self.width)
-            y = random.randint(0, self.height)
-            color = tuple(c + random.randint(-20, 20) for c in self.config["scratch_color"])
-            color = tuple(max(0, min(255, c)) for c in color)
-            pygame.draw.circle(self.scratch_surface, (*color, 255), (x, y), random.randint(2, 8))
+            scratch_font = pygame.font.Font(None, 36)
+            scratch_text = scratch_font.render("SCRATCH HERE!", True, (100, 100, 100))
+            scratch_rect = scratch_text.get_rect(center=(self.width//2, self.height//2))
+            self.scratch_surface.blit(scratch_text, scratch_rect)
+
+            for _ in range(50):
+                x = random.randint(0, self.width)
+                y = random.randint(0, self.height)
+                color = tuple(c + random.randint(-20, 20) for c in self.config["scratch_color"])
+                color = tuple(max(0, min(255, c)) for c in color)
+                pygame.draw.circle(self.scratch_surface, (*color, 255), (x, y), random.randint(2, 8))
 
         # Calculate total scratchable pixels
         self.total_pixels = self.width * self.height
@@ -218,7 +232,7 @@ class Match3Ticket:
 
     # Fixed size for Match 3 tickets - larger to fit symbols properly
     TICKET_WIDTH = 340
-    TICKET_HEIGHT = 280
+    TICKET_HEIGHT = 400
 
     # Grid layout constants
     GRID_PADDING = 20  # Padding around the grid
@@ -346,24 +360,31 @@ class Match3Ticket:
 
     def _create_surfaces(self):
         """Create the ticket surfaces."""
-        # Base ticket surface
+        # Base ticket surface (custom PNG or fallback procedural)
         self.base_surface = pygame.Surface((self.width, self.height))
-        self.base_surface.fill(self.config["color"])
 
-        # Draw ticket border
-        pygame.draw.rect(self.base_surface, (255, 255, 255),
-                        (0, 0, self.width, self.height), 4, border_radius=12)
+        base_img_name = self.config.get("base_image")
+        if base_img_name and base_img_name in TICKET_IMAGES:
+            scaled = pygame.transform.scale(TICKET_IMAGES[base_img_name],
+                                            (self.width, self.height))
+            self.base_surface.blit(scaled, (0, 0))
+        else:
+            self.base_surface.fill(self.config["color"])
 
-        # Draw ticket name at top
-        font = pygame.font.Font(None, 32)
-        name_text = font.render(self.config["name"], True, (255, 255, 255))
-        name_rect = name_text.get_rect(centerx=self.width//2, y=10)
-        self.base_surface.blit(name_text, name_rect)
+            # Draw ticket border
+            pygame.draw.rect(self.base_surface, (255, 255, 255),
+                            (0, 0, self.width, self.height), 4, border_radius=12)
 
-        # Draw "Match 3 to Win!" subtitle
-        small_font = pygame.font.Font(None, 22)
-        subtitle = small_font.render("Match 3 to Win!", True, (255, 255, 200))
-        self.base_surface.blit(subtitle, (self.width//2 - subtitle.get_width()//2, 32))
+            # Draw ticket name at top
+            font = pygame.font.Font(None, 32)
+            name_text = font.render(self.config["name"], True, (255, 255, 255))
+            name_rect = name_text.get_rect(centerx=self.width//2, y=10)
+            self.base_surface.blit(name_text, name_rect)
+
+            # Draw "Match 3 to Win!" subtitle
+            small_font = pygame.font.Font(None, 22)
+            subtitle = small_font.render("Match 3 to Win!", True, (255, 255, 200))
+            self.base_surface.blit(subtitle, (self.width//2 - subtitle.get_width()//2, 32))
 
         # Draw grid background
         grid_bg_rect = pygame.Rect(
@@ -388,22 +409,36 @@ class Match3Ticket:
             self.base_surface.blit(prize_text,
                 (self.width//2 - prize_text.get_width()//2, self.height - 28))
 
-        # Scratch layer
+        # Scratch layer (custom PNG or fallback solid color)
         self.scratch_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        self.scratch_surface.fill((*self.config["scratch_color"], 255))
 
-        # Draw "SCRATCH TO REVEAL!" text
-        scratch_font = pygame.font.Font(None, 26)
-        scratch_text = scratch_font.render("SCRATCH TO REVEAL!", True, (100, 100, 100))
-        self.scratch_surface.blit(scratch_text,
-            (self.width//2 - scratch_text.get_width()//2, 10))
+        scratch_img_name = self.config.get("scratch_image")
+        if scratch_img_name and scratch_img_name in TICKET_IMAGES:
+            # Use custom pixel-art cover scaled to ticket size
+            scaled = pygame.transform.scale(TICKET_IMAGES[scratch_img_name],
+                                            (self.width, self.height))
+            self.scratch_surface.blit(scaled, (0, 0))
+        else:
+            # Fallback: solid scratch color with texture
+            self.scratch_surface.fill((*self.config["scratch_color"], 255))
 
-        # Draw ? marks for each cell in their own boxes
+            scratch_font = pygame.font.Font(None, 26)
+            scratch_text = scratch_font.render("SCRATCH TO REVEAL!", True, (100, 100, 100))
+            self.scratch_surface.blit(scratch_text,
+                (self.width//2 - scratch_text.get_width()//2, 10))
+
+            for _ in range(30):
+                x = random.randint(0, self.width)
+                y = random.randint(0, self.height)
+                color = tuple(c + random.randint(-10, 10) for c in self.config["scratch_color"])
+                color = tuple(max(0, min(255, c)) for c in color)
+                pygame.draw.circle(self.scratch_surface, (*color, 255), (x, y), random.randint(1, 4))
+
+        # Draw cell indicator boxes on top (always drawn so player knows where to scratch)
         q_font = pygame.font.Font(None, int(self.cell_size * 0.6))
         for i in range(9):
             cx, cy = self.cell_centers[i]
 
-            # Draw cell outline on scratch surface
             cell_rect = pygame.Rect(
                 cx - self.cell_size // 2 + 2,
                 cy - self.cell_size // 2 + 2,
@@ -413,17 +448,8 @@ class Match3Ticket:
             pygame.draw.rect(self.scratch_surface, (150, 130, 150, 255), cell_rect, border_radius=8)
             pygame.draw.rect(self.scratch_surface, (120, 100, 120, 255), cell_rect, 2, border_radius=8)
 
-            # Draw ? in center
             q_text = q_font.render("?", True, (80, 60, 80))
             self.scratch_surface.blit(q_text, (cx - q_text.get_width()//2, cy - q_text.get_height()//2))
-
-        # Add subtle texture
-        for _ in range(30):
-            x = random.randint(0, self.width)
-            y = random.randint(0, self.height)
-            color = tuple(c + random.randint(-10, 10) for c in self.config["scratch_color"])
-            color = tuple(max(0, min(255, c)) for c in color)
-            pygame.draw.circle(self.scratch_surface, (*color, 255), (x, y), random.randint(1, 4))
 
     def _draw_symbol(self, cx, cy, symbol_name, cell_size, is_winner=False):
         """Draw a symbol using sprite images instead of procedural shapes."""
@@ -568,6 +594,391 @@ class Match3Ticket:
         return pygame.Rect(self.x, self.y, self.width, self.height)
 
 
+class NumberMatchTicket:
+    """A scratch ticket with 5 winning numbers at top, 4x5 grid of your numbers with prizes,
+    and a bonus multiplier box. Match any of your numbers to a winning number to win that prize."""
+
+    TICKET_WIDTH = 380
+    TICKET_HEIGHT = 420
+
+    HEADER_HEIGHT = 42
+    WINNING_ROW_HEIGHT = 50
+    GRID_TOP_MARGIN = 8
+    CELL_W = 50
+    CELL_H = 48
+    CELL_PAD = 4
+    MULTIPLIER_W = 52
+    FOOTER_HEIGHT = 10
+
+    def __init__(self, ticket_type, x, y, width=380, height=420, luck_bonus=0):
+        self.ticket_type = ticket_type
+        self.config = TICKET_TYPES[ticket_type]
+        self.x = x
+        self.y = y
+        self.width = self.TICKET_WIDTH
+        self.height = self.TICKET_HEIGHT
+        self.luck_bonus = luck_bonus
+
+        # Drag handle
+        self.handle_height = 28
+        self.dragging = False
+        self.drag_offset = (0, 0)
+
+        # Generate game data
+        self.winning_numbers = self._generate_winning_numbers()
+        self.grid_numbers = self._generate_grid_numbers()   # 4 rows x 5 cols
+        self.grid_prizes = self._generate_grid_prizes()      # prize under each number
+        self.multiplier = self._generate_multiplier()
+
+        # Calculate total prize
+        self.prize = self._calculate_prize()
+
+        # Cell tracking: 5 winning + 20 grid + 1 multiplier = 26 cells
+        self.num_cells = 26
+        self.cells_revealed = [False] * self.num_cells
+        # Indices: 0-4 = winning numbers, 5-24 = grid (row-major), 25 = multiplier
+
+        # Calculate cell positions
+        self._calculate_layout()
+
+        # Create surfaces
+        self._create_surfaces()
+
+        # Scratch tracking
+        self.scratched = False
+        self.scratch_percent = 0
+        self.revealed = False
+
+    def _generate_winning_numbers(self):
+        """Generate 5 unique winning numbers (1-30)."""
+        return random.sample(range(1, 31), 5)
+
+    def _generate_grid_numbers(self):
+        """Generate 4x5 grid of numbers. Luck bonus increases match chance."""
+        numbers = []
+        match_chance = 0.15 + (self.luck_bonus * 0.03)  # 15% base per cell
+
+        for _ in range(20):
+            if random.random() < match_chance:
+                # Force a match with one of the winning numbers
+                numbers.append(random.choice(self.winning_numbers))
+            else:
+                numbers.append(random.randint(1, 30))
+        return numbers
+
+    def _generate_grid_prizes(self):
+        """Generate a prize value for each of the 20 grid cells."""
+        prize_pool = self.config["cell_prizes"]
+        return [random.choice(prize_pool) for _ in range(20)]
+
+    def _generate_multiplier(self):
+        """Generate the bonus multiplier (1x, 2x, 3x, 5x)."""
+        multiplier_weights = self.config.get("multipliers", [1, 1, 1, 1, 1, 2, 2, 3, 5])
+        return random.choice(multiplier_weights)
+
+    def _calculate_prize(self):
+        """Calculate total prize: sum of prizes for matched numbers * multiplier."""
+        total = 0
+        for i, num in enumerate(self.grid_numbers):
+            if num in self.winning_numbers:
+                total += self.grid_prizes[i]
+        return total * self.multiplier
+
+    def _calculate_layout(self):
+        """Calculate positions and bounds for all scratchable cells."""
+        self.cell_centers = []
+        self.cell_bounds = []
+
+        # --- Winning numbers row (5 cells across the top) ---
+        win_row_y = self.HEADER_HEIGHT + self.WINNING_ROW_HEIGHT // 2
+        total_win_w = 5 * self.CELL_W + 4 * self.CELL_PAD
+        grid_total_w = 5 * self.CELL_W + 4 * self.CELL_PAD
+
+        win_start_x = (self.width - grid_total_w - self.MULTIPLIER_W - 8) // 2
+
+        for col in range(5):
+            cx = (win_start_x + col * (self.CELL_W + self.CELL_PAD) + self.CELL_W // 2)
+            cy = win_row_y
+            self.cell_centers.append((cx, cy))
+            self.cell_bounds.append(pygame.Rect(
+                cx - self.CELL_W // 2, cy - self.CELL_H // 2 + 4,
+                self.CELL_W, self.CELL_H - 8))
+
+        # --- Grid numbers (4 rows x 5 cols) ---
+        grid_top = self.HEADER_HEIGHT + self.WINNING_ROW_HEIGHT + self.GRID_TOP_MARGIN
+        grid_total_w = 5 * self.CELL_W + 4 * self.CELL_PAD
+        # Shift grid left a bit to make room for multiplier box on the right
+        grid_start_x = (self.width - grid_total_w - self.MULTIPLIER_W - 8) // 2
+
+        for row in range(4):
+            for col in range(5):
+                cx = grid_start_x + col * (self.CELL_W + self.CELL_PAD) + self.CELL_W // 2
+                cy = grid_top + row * (self.CELL_H + self.CELL_PAD) + self.CELL_H // 2
+                self.cell_centers.append((cx, cy))
+                self.cell_bounds.append(pygame.Rect(
+                    cx - self.CELL_W // 2, cy - self.CELL_H // 2,
+                    self.CELL_W, self.CELL_H))
+
+        # --- Multiplier box (to the right of the grid, vertically centered) ---
+        mult_cx = grid_start_x + grid_total_w + 8 + self.MULTIPLIER_W // 2
+        mult_cy = grid_top + (4 * (self.CELL_H + self.CELL_PAD)) // 2
+        self.cell_centers.append((mult_cx, mult_cy))
+        self.cell_bounds.append(pygame.Rect(
+            mult_cx - self.MULTIPLIER_W // 2, mult_cy - 30,
+            self.MULTIPLIER_W, 60))
+
+    def _create_surfaces(self):
+        """Create base and scratch surfaces."""
+        self.base_surface = pygame.Surface((self.width, self.height))
+
+        base_img_name = self.config.get("base_image")
+        if base_img_name and base_img_name in TICKET_IMAGES:
+            scaled = pygame.transform.scale(TICKET_IMAGES[base_img_name],
+                                            (self.width, self.height))
+            self.base_surface.blit(scaled, (0, 0))
+        else:
+            self.base_surface.fill(self.config["color"])
+
+            # Border
+            pygame.draw.rect(self.base_surface, (255, 255, 255),
+                             (0, 0, self.width, self.height), 4, border_radius=12)
+
+            # Title
+            font = pygame.font.Font(None, 30)
+            name_text = font.render(self.config["name"], True, (255, 255, 255))
+            self.base_surface.blit(name_text,
+                (self.width // 2 - name_text.get_width() // 2, 8))
+
+            # Subtitle
+            small_font = pygame.font.Font(None, 20)
+            sub = small_font.render("Match YOUR numbers to WINNING numbers!", True, (255, 255, 200))
+            self.base_surface.blit(sub, (self.width // 2 - sub.get_width() // 2, 28))
+
+        # --- Draw winning numbers section ---
+        win_bg = pygame.Rect(self.cell_bounds[0].x - 6, self.HEADER_HEIGHT - 2,
+                             self.cell_bounds[4].right - self.cell_bounds[0].x + 12,
+                             self.WINNING_ROW_HEIGHT + 4)
+        pygame.draw.rect(self.base_surface, (255, 230, 180), win_bg, border_radius=8)
+        pygame.draw.rect(self.base_surface, (200, 160, 80), win_bg, 2, border_radius=8)
+
+        label_font = pygame.font.Font(None, 16)
+        win_label = label_font.render("WINNING NUMBERS", True, (140, 100, 40))
+        self.base_surface.blit(win_label,
+            (win_bg.centerx - win_label.get_width() // 2, win_bg.y + 2))
+
+        num_font = pygame.font.Font(None, 32)
+        for i in range(5):
+            cx, cy = self.cell_centers[i]
+            # Draw cell background
+            cell_rect = self.cell_bounds[i]
+            pygame.draw.rect(self.base_surface, (255, 255, 240),
+                             cell_rect, border_radius=6)
+            pygame.draw.rect(self.base_surface, (180, 150, 80),
+                             cell_rect, 2, border_radius=6)
+            # Draw number
+            txt = num_font.render(str(self.winning_numbers[i]), True, (60, 40, 20))
+            self.base_surface.blit(txt, (cx - txt.get_width() // 2, cy - txt.get_height() // 2 + 4))
+
+        # --- Draw grid section ---
+        grid_bg = pygame.Rect(
+            self.cell_bounds[5].x - 6,
+            self.cell_bounds[5].y - 6,
+            self.cell_bounds[9].right - self.cell_bounds[5].x + 12,
+            self.cell_bounds[24].bottom - self.cell_bounds[5].y + 12)
+        pygame.draw.rect(self.base_surface, (240, 240, 255), grid_bg, border_radius=8)
+        pygame.draw.rect(self.base_surface, (150, 150, 200), grid_bg, 2, border_radius=8)
+
+        num_font_sm = pygame.font.Font(None, 26)
+        prize_font = pygame.font.Font(None, 18)
+
+        for i in range(20):
+            idx = i + 5  # offset past winning numbers
+            cx, cy = self.cell_centers[idx]
+            cell_rect = self.cell_bounds[idx]
+            num = self.grid_numbers[i]
+            prize_val = self.grid_prizes[i]
+            is_match = num in self.winning_numbers
+
+            # Cell background
+            bg_color = (255, 255, 200) if is_match else (255, 255, 255)
+            pygame.draw.rect(self.base_surface, bg_color, cell_rect, border_radius=5)
+            pygame.draw.rect(self.base_surface, (180, 180, 200), cell_rect, 2, border_radius=5)
+
+            if is_match:
+                # Highlight border for matches
+                pygame.draw.rect(self.base_surface, (50, 180, 50), cell_rect, 2, border_radius=5)
+
+            # Number (top half of cell)
+            txt = num_font_sm.render(str(num), True, (40, 40, 80))
+            self.base_surface.blit(txt, (cx - txt.get_width() // 2, cy - 16))
+
+            # Prize (bottom half of cell)
+            prize_color = (50, 150, 50) if is_match else (120, 120, 140)
+            ptxt = prize_font.render(f"${prize_val}", True, prize_color)
+            self.base_surface.blit(ptxt, (cx - ptxt.get_width() // 2, cy + 8))
+
+        # --- Draw multiplier box ---
+        mult_cx, mult_cy = self.cell_centers[25]
+        mult_rect = self.cell_bounds[25]
+        pygame.draw.rect(self.base_surface, (255, 220, 100), mult_rect, border_radius=8)
+        pygame.draw.rect(self.base_surface, (200, 160, 50), mult_rect, 3, border_radius=8)
+
+        mult_label = label_font.render("BONUS", True, (140, 100, 20))
+        self.base_surface.blit(mult_label,
+            (mult_cx - mult_label.get_width() // 2, mult_rect.y + 4))
+
+        mult_font = pygame.font.Font(None, 36)
+        mult_txt = mult_font.render(f"{self.multiplier}x", True, (180, 80, 20))
+        self.base_surface.blit(mult_txt,
+            (mult_cx - mult_txt.get_width() // 2, mult_cy + 2))
+
+        # --- Draw prize total at bottom if winner ---
+        if self.prize > 0:
+            total_font = pygame.font.Font(None, 26)
+            total_txt = total_font.render(f"TOTAL WIN: ${self.prize}!", True, (50, 200, 50))
+            self.base_surface.blit(total_txt,
+                (self.width // 2 - total_txt.get_width() // 2, self.height - 22))
+
+        # ========== SCRATCH SURFACE (custom PNG or fallback solid color) ==========
+        self.scratch_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+
+        scratch_img_name = self.config.get("scratch_image")
+        if scratch_img_name and scratch_img_name in TICKET_IMAGES:
+            # Use custom pixel-art cover scaled to ticket size
+            scaled = pygame.transform.scale(TICKET_IMAGES[scratch_img_name],
+                                            (self.width, self.height))
+            self.scratch_surface.blit(scaled, (0, 0))
+        else:
+            # Fallback: solid scratch color with texture
+            self.scratch_surface.fill((*self.config["scratch_color"], 255))
+
+            scratch_font = pygame.font.Font(None, 24)
+            stxt = scratch_font.render("SCRATCH ALL BOXES!", True, (100, 100, 100))
+            self.scratch_surface.blit(stxt,
+                (self.width // 2 - stxt.get_width() // 2, 10))
+
+            for _ in range(40):
+                tx = random.randint(0, self.width)
+                ty = random.randint(0, self.height)
+                color = tuple(c + random.randint(-10, 10) for c in self.config["scratch_color"])
+                color = tuple(max(0, min(255, c)) for c in color)
+                pygame.draw.circle(self.scratch_surface, (*color, 255), (tx, ty), random.randint(1, 4))
+
+        # Draw cell indicator boxes on top (always drawn so player knows where to scratch)
+        q_font = pygame.font.Font(None, 28)
+        for i in range(self.num_cells):
+            rect = self.cell_bounds[i]
+            pygame.draw.rect(self.scratch_surface, (160, 150, 170, 255),
+                             rect, border_radius=6)
+            pygame.draw.rect(self.scratch_surface, (130, 120, 140, 255),
+                             rect, 2, border_radius=6)
+            q = q_font.render("?", True, (90, 80, 100))
+            self.scratch_surface.blit(q,
+                (rect.centerx - q.get_width() // 2, rect.centery - q.get_height() // 2))
+
+    def scratch(self, mouse_x, mouse_y, radius=20):
+        """Scratch at the given position."""
+        local_x = mouse_x - self.x
+        local_y = mouse_y - self.y
+
+        if 0 <= local_x < self.width and 0 <= local_y < self.height:
+            old_revealed = sum(self.cells_revealed)
+
+            pygame.draw.circle(self.scratch_surface, (0, 0, 0, 0), (local_x, local_y), radius)
+            for _ in range(3):
+                ox = local_x + random.randint(-radius // 2, radius // 2)
+                oy = local_y + random.randint(-radius // 2, radius // 2)
+                sr = random.randint(radius // 3, radius // 2)
+                pygame.draw.circle(self.scratch_surface, (0, 0, 0, 0), (ox, oy), sr)
+
+            self.scratched = True
+            self._update_cells_revealed()
+
+            return {
+                "x": mouse_x,
+                "y": mouse_y,
+                "color": self.config["scratch_color"],
+                "new_reveal": sum(self.cells_revealed) > old_revealed
+            }
+        return None
+
+    def _update_cells_revealed(self):
+        """Check which cells have been sufficiently scratched."""
+        for i in range(self.num_cells):
+            if self.cells_revealed[i]:
+                continue
+
+            rect = self.cell_bounds[i]
+            cx = rect.centerx
+            cy = rect.centery
+            half_w = rect.width // 4
+            half_h = rect.height // 4
+
+            sample_count = 0
+            revealed_count = 0
+
+            for sx in range(-1, 2):
+                for sy in range(-1, 2):
+                    px = cx + sx * half_w
+                    py = cy + sy * half_h
+                    if 0 <= px < self.width and 0 <= py < self.height:
+                        sample_count += 1
+                        pixel = self.scratch_surface.get_at((px, py))
+                        if pixel[3] < 128:
+                            revealed_count += 1
+
+            if sample_count > 0 and revealed_count >= max(5, sample_count * 0.6):
+                self.cells_revealed[i] = True
+
+        if all(self.cells_revealed) and not self.revealed:
+            self.revealed = True
+
+    def is_complete(self):
+        """Ticket is complete when all cells are revealed."""
+        return all(self.cells_revealed)
+
+    def get_cells_revealed_count(self):
+        return sum(self.cells_revealed)
+
+    def get_prize(self):
+        return self.prize
+
+    def set_position(self, x, y):
+        self.x = x
+        self.y = y
+
+    def get_handle_rect(self):
+        return pygame.Rect(self.x, self.y, self.width, self.handle_height)
+
+    def draw(self, screen):
+        screen.blit(self.base_surface, (self.x, self.y))
+        screen.blit(self.scratch_surface, (self.x, self.y))
+        pygame.draw.rect(screen, (80, 60, 40),
+                         (self.x - 2, self.y - 2, self.width + 4, self.height + 4),
+                         4, border_radius=12)
+
+        # Drag handle
+        handle_surf = pygame.Surface((self.width, self.handle_height), pygame.SRCALPHA)
+        handle_surf.fill((0, 0, 0, 60))
+        screen.blit(handle_surf, (self.x, self.y))
+        for i in range(3):
+            ly = self.y + 9 + i * 6
+            pygame.draw.line(screen, (180, 180, 180),
+                             (self.x + self.width // 2 - 20, ly),
+                             (self.x + self.width // 2 + 20, ly), 1)
+
+        # Progress indicator
+        revealed = self.get_cells_revealed_count()
+        if revealed < self.num_cells and self.scratched:
+            font = pygame.font.Font(None, 20)
+            ptxt = font.render(f"{revealed}/{self.num_cells} revealed", True, (200, 200, 200))
+            screen.blit(ptxt,
+                (self.x + self.width // 2 - ptxt.get_width() // 2, self.y + self.height + 5))
+
+    def get_rect(self):
+        return pygame.Rect(self.x, self.y, self.width, self.height)
+
+
 def create_ticket(ticket_type, x, y, width=300, height=200, luck_bonus=0):
     """Factory function to create the right ticket type."""
     config = TICKET_TYPES[ticket_type]
@@ -576,5 +987,7 @@ def create_ticket(ticket_type, x, y, width=300, height=200, luck_bonus=0):
     if ticket_class == "match3":
         # Match3 tickets use their own fixed size for proper symbol spacing
         return Match3Ticket(ticket_type, x, y, luck_bonus=luck_bonus)
+    elif ticket_class == "number_match":
+        return NumberMatchTicket(ticket_type, x, y, luck_bonus=luck_bonus)
     else:
         return ScratchTicket(ticket_type, x, y, width, height, luck_bonus)

@@ -1,24 +1,24 @@
 {
-  "money": 27644.0,
-  "total_earned": 30801.0,
-  "total_spent": 3162.0,
-  "tickets_scratched": 100,
-  "biggest_win": 5000,
+  "money": 9363.0,
+  "total_earned": 9697.0,
+  "total_spent": 339.0,
+  "tickets_scratched": 15,
+  "biggest_win": 6250,
   "upgrades": {
     "lucky_charm": 0,
-    "scratch_speed": 1,
-    "auto_scratcher": 4,
-    "auto_collect": 1,
+    "scratch_speed": 0,
+    "auto_scratcher": 0,
+    "auto_collect": 0,
     "bulk_buy": 0,
     "lucky_charm1": 0,
     "lucky_charm2": 0,
     "lucky_charm3": 0
   },
   "items": {
-    "beer": 1,
+    "beer": 0,
     "cigarette": 0
   },
-  "player_level": 10,
-  "current_xp": 496.6580000000431,
-  "current_bladder": 65.92499999999973
+  "player_level": 6,
+  "current_xp": 362,
+  "current_bladder": 43.72999999999995
 }

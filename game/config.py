@@ -37,6 +37,32 @@ def load_symbol_images():
         "orange": pygame.image.load("assets/symbols/orange.png"),
     })
 
+# Custom ticket artwork — loaded once, keyed by filename
+# Each ticket type can specify "scratch_image" and/or "base_image" in its config
+# to use a custom PNG instead of the procedural solid-color surface.
+# PNGs go in assets/tickets/ and are scaled to the ticket's dimensions at load time.
+TICKET_IMAGES = {}
+
+def load_ticket_images():
+    """Load all unique ticket artwork PNGs referenced by TICKET_TYPES.
+    Call once after pygame.display is initialised (same time as load_symbol_images)."""
+    import os
+    if TICKET_IMAGES:
+        return
+    # Gather every unique filename referenced by any ticket type
+    needed = set()
+    for cfg in TICKET_TYPES.values():
+        for key in ("scratch_image", "base_image"):
+            fname = cfg.get(key)
+            if fname:
+                needed.add(fname)
+    for fname in needed:
+        path = os.path.join("assets", "tickets", fname)
+        if os.path.isfile(path):
+            TICKET_IMAGES[fname] = pygame.image.load(path).convert_alpha()
+        else:
+            print(f"[ticket art] WARNING: {path} not found — will use fallback")
+
 # Ticket type definitions
 TICKET_TYPES = {
     "chud":{"name":"loser",
@@ -67,8 +93,9 @@ TICKET_TYPES = {
     "match3": {
         "name": "Match 3",
         "cost": 3,
-        "color": (200, 100, 150),  # Pink
+        "color": (255,0,0),  # Red
         "scratch_color": (220, 180, 200),
+        "scratch_image":"test_surface.png",
         "symbols": ["cherry", "lemon", "orange", "grape", "bell"],  # Available symbols
         "unlock_threshold": 25,
         "ticket_class": "match3",
@@ -117,6 +144,26 @@ TICKET_TYPES = {
         "prizes": [0, 0, 0, 0, 0, 0, 50, 100, 500, 5000],
         "unlock_threshold": 1000,
         "ticket_class": "standard",
+    },
+    "number_match": {
+        "name": "Number Match",
+        "cost": 12,
+        "color": (80, 140, 200),  # Steel blue
+        "scratch_color": (190, 200, 220),
+        "cell_prizes": [1, 2, 5, 5, 10, 10, 15, 20, 25, 50],
+        "multipliers": [1, 1, 1, 1, 1, 2, 2, 3, 5],
+        "unlock_threshold": 300,
+        "ticket_class": "number_match",
+    },
+    "number_match_gold": {
+        "name": "Gold Rush",
+        "cost": 30,
+        "color": (200, 160, 60),  # Rich gold
+        "scratch_color": (230, 215, 170),
+        "cell_prizes": [5, 10, 20, 25, 50, 50, 100, 100, 250, 500],
+        "multipliers": [1, 1, 1, 2, 2, 3, 3, 5, 10],
+        "unlock_threshold": 1500,
+        "ticket_class": "number_match",
     },
 }
 
