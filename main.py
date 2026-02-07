@@ -3,7 +3,7 @@ import sys
 import random
 import math
 
-from game.config import TICKET_TYPES, UPGRADES, ITEMS, LEVEL_CONFIG, PEE_CONFIG
+from game.config import TICKET_TYPES, UPGRADES, ITEMS, LEVEL_CONFIG, PEE_CONFIG, load_symbol_images
 from game.ticket import ScratchTicket, create_ticket
 from game.player import Player
 from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
@@ -12,6 +12,7 @@ from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
 from game.effects import DrunkEffect
 from game.particles import ParticleSystem, ScreenShake
 from game.pee_minigame import PeeMinigame
+from game.ticket_mat import TicketMatManager
 
 # Initialize Pygame
 pygame.init()
@@ -26,6 +27,7 @@ BG_COLOR = (35, 40, 50)
 COUNTER_COLOR = (55, 60, 70)
 
 
+
 class Game:
     def __init__(self):
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -33,12 +35,16 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
 
+        # Load images now that display exists
+        load_symbol_images()
+
         # Game objects
         self.player = Player()
-        self.current_ticket = None
-        self.ticket_queue = []
 
-        # UI - Popup menus
+        # Multi-ticket mat system (replaces single current_ticket + ticket_queue)
+        self.mat = TicketMatManager()
+
+        # UI - Popup menus (kept as reference, no longer opened)
         self.ticket_shop = TicketShopPopup(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.ticket_shop.setup_buttons(TICKET_TYPES, self.player.get_unlocked_tickets())
 
@@ -51,7 +57,7 @@ class Game:
 
         self.ticket_inventory = TicketInventoryPopup(SCREEN_WIDTH, SCREEN_HEIGHT)
 
-        # Main screen buttons (COLLECT + PEE still used from here)
+        # Main screen buttons (PEE still used)
         self.main_buttons = MainMenuButtons(SCREEN_WIDTH, SCREEN_HEIGHT)
 
         # Side menu system (non-blocking replacement for popup menus)
@@ -100,10 +106,8 @@ class Game:
 
         # State
         self.scratching = False
-        self.pending_prize = 0
         self.auto_scratch_timer = 0
         self.auto_collect_timer = 0
-        self.auto_collect_total_time = None
         self.game_lost = False
 
         # Track mouse state for click detection
@@ -114,98 +118,75 @@ class Game:
         # Debug variable
 
     def _create_background(self):
-        """Create static background and separate scratching mat."""
+        """Create static background."""
 
         # LOAD pixel art background instead of drawing it
         bg_image = pygame.image.load("assets/background/temp_bg.png").convert()
         bg = pygame.transform.scale(bg_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
-
-        mat_w = SCREEN_WIDTH // 2
-        mat_h = SCREEN_HEIGHT // 2
-
-        mat = pygame.Surface((mat_w, mat_h), pygame.SRCALPHA)
-
-        pygame.draw.rect(mat, (45, 50, 60), mat.get_rect(), border_radius=15)
-        pygame.draw.rect(mat, (65, 70, 80), mat.get_rect(), 2, border_radius=15)
-
-        font = pygame.font.Font(None, 32)
-        hint_text = font.render("Buy a ticket to start!", True, (80, 85, 95))
-
-        mat.blit(hint_text, (
-            mat_w // 2 - hint_text.get_width() // 2,
-            mat_h // 2
-        ))
-
-        self.mat_surface = mat
-        self.mat_pos = (500,250)
-
         return bg
 
     def buy_ticket(self, ticket_type):
         """Buy a ticket of the given type."""
         config = TICKET_TYPES[ticket_type]
         if self.player.spend(config["cost"]):
-            # Create new ticket centered on the counter
+            # Create ticket — position doesn't matter, mat will set it during deal anim
             ticket = create_ticket(
                 ticket_type,
-                SCREEN_WIDTH // 2 - 100 ,  # Center X (account for ticket width)
-                SCREEN_HEIGHT // 2 - 150,  # Center Y
+                0, 0,
                 340, 280,
                 luck_bonus=self.player.get_luck_bonus()
             )
-
-            if self.current_ticket is None:
-                self.current_ticket = ticket
-                self.auto_collect_timer = 0  # Reset auto-collect timer
-            else:
-                self.ticket_queue.append(ticket)
-
+            self.mat.add_ticket(ticket)
             self.player.save_game()
             return True
         return False
 
-    def handle_scratch(self, mouse_pos):
-        if self.current_ticket and not self.current_ticket.is_complete():
-            radius = self.player.get_scratch_radius()
+    def handle_scratch(self, mouse_pos, ticket=None):
+        """Scratch the given ticket (or auto-detected from mouse position).
+        Only the topmost ticket at the point can be scratched (z-order blocking)."""
+        if ticket is None:
+            ticket = self.mat.get_ticket_at_point(mouse_pos)
+        if ticket is None or ticket.is_complete():
+            return
 
-            mx, my = mouse_pos
+        # Promote to top so the ticket being scratched draws on top
+        self.mat._promote_to_top(ticket)
 
-            # Same offsets used in draw()
-            shake_offset = self.screen_shake.get_offset()
+        radius = self.player.get_scratch_radius()
 
-            if self.drunk.enabled:
-                drunk_offset = self.drunk.get_offset()
-                ticket_offset = self.drunk.get_ticket_offset()
+        mx, my = mouse_pos
 
-                mx -= (shake_offset[0] + drunk_offset[0]) * 0.4 + ticket_offset[0]
-                my -= (shake_offset[1] + drunk_offset[1]) * 0.4 + ticket_offset[1]
-            else:
-                mx -= shake_offset[0]
-                my -= shake_offset[1]
+        # Same offsets used in draw()
+        shake_offset = self.screen_shake.get_offset()
 
-            result = self.current_ticket.scratch(mx, my, radius)
+        if self.drunk.enabled:
+            drunk_offset = self.drunk.get_offset()
+            ticket_offset = self.drunk.get_ticket_offset()
 
-            if result:
-                self.particles.add_scratch_particles(
-                    result["x"], result["y"], result["color"], count=3
-                )
-                # XP only when actually revealing new area
-                if result.get("new_reveal"):
-                    if self.player.gain_xp(LEVEL_CONFIG["xp_sources"]["scratch_per_cell"]):
-                        self.messages.add_message(f"LEVEL UP! Lv.{self.player.player_level}", (255, 255, 100))
+            mx -= (shake_offset[0] + drunk_offset[0]) * 0.4 + ticket_offset[0]
+            my -= (shake_offset[1] + drunk_offset[1]) * 0.4 + ticket_offset[1]
+        else:
+            mx -= shake_offset[0]
+            my -= shake_offset[1]
 
-            if self.current_ticket.is_complete():
-                self._handle_ticket_complete()
+        result = ticket.scratch(mx, my, radius)
 
-    def _handle_ticket_complete(self):
+        if result:
+            self.particles.add_scratch_particles(
+                result["x"], result["y"], result["color"], count=3
+            )
+            # XP only when actually revealing new area
+            if result.get("new_reveal"):
+                if self.player.gain_xp(LEVEL_CONFIG["xp_sources"]["scratch_per_cell"]):
+                    self.messages.add_message(f"LEVEL UP! Lv.{self.player.player_level}", (255, 255, 100))
+
+        if ticket.is_complete():
+            self._handle_ticket_complete(ticket)
+
+    def _handle_ticket_complete(self, ticket):
         """Handle when a ticket is fully scratched."""
-        prize = self.current_ticket.get_prize()
-        self.pending_prize = prize
+        prize = ticket.get_prize()
         self.player.scratch_ticket()
-
-        # Reset auto-collect timer
-        self.auto_collect_timer = 0
-        self.auto_collect_total_time = self.player.get_auto_collect_delay()
 
         # XP for completing a ticket
         leveled = self.player.gain_xp(LEVEL_CONFIG["xp_sources"]["ticket_complete"])
@@ -215,10 +196,10 @@ class Game:
             self.messages.add_message(f"LEVEL UP! Lv.{self.player.player_level}", (255, 255, 100))
 
         if prize > 0:
-            self.messages.add_message(f"WIN ${prize}!", (100, 255, 100), flag="WIN_PRIZE")
+            self.messages.add_message(f"WIN ${prize}! Drag to redeem!", (100, 255, 100), flag="WIN_PRIZE")
 
-            ticket_center_x = self.current_ticket.x + self.current_ticket.width // 2
-            ticket_center_y = self.current_ticket.y + self.current_ticket.height // 2
+            ticket_center_x = ticket.x + ticket.width // 2
+            ticket_center_y = ticket.y + ticket.height // 2
 
             # $1000+ JACKPOT
             if prize >= 1000:
@@ -265,69 +246,33 @@ class Game:
         else:
             self.messages.add_message("Try again!", (255, 150, 100), flag="TRY_AGAIN")
             self.player.lose_morale(5)
-            # Loser ticket — auto-collect immediately, no need to prompt the player
-            self.collect_winnings()
+            # Loser ticket — auto-dissolve (fade out and remove)
+            self.mat.dissolve_ticket(ticket)
             return
 
-        self.main_buttons.set_collect_enabled(True)
+    def _redeem_ticket(self, ticket):
+        """Redeem a completed ticket dropped on the redeem box."""
+        prize = ticket.get_prize()
+        if prize > 0:
+            self.player.earn(prize)
+            self.messages.add_message(f"+${prize}", (100, 255, 100), 1.0, flag="AMOUNT_TEXT")
 
-    def collect_winnings(self):
-        """Collect winnings from completed ticket."""
-        if self.pending_prize > 0:
-            self.player.earn(self.pending_prize)
-            self.messages.add_message(f"+${self.pending_prize}", (100, 255, 100), 1.0, flag="AMOUNT_TEXT")
-            self.pending_prize = 0
-
-        # Move to next ticket or clear
-        if self.ticket_queue:
-            self.current_ticket = self.ticket_queue.pop(0)
-            self.auto_collect_timer = 0
-            self.auto_collect_total_time = None
-        else:
-            self.current_ticket = None
-
-        self.main_buttons.set_collect_enabled(False)
+        self.mat.remove_ticket(ticket)
         self.player.save_game()
 
         # Update shop buttons for unlocks
         self.ticket_shop.setup_buttons(TICKET_TYPES, self.player.get_unlocked_tickets())
 
-    def _switch_to_ticket(self, ticket):
-        """Switch the active ticket to the selected one from inventory."""
-        # If the selected ticket IS already current, do nothing
-        if ticket is self.current_ticket:
-            return
-
-        # If current ticket is complete and has uncollected winnings, block
-        if self.current_ticket and self.current_ticket.is_complete() and self.pending_prize > 0:
-            self.messages.add_message("Collect winnings first!", (255, 200, 100))
-            return
-
-        # If current ticket is complete with $0 prize (loser), discard it
-        if self.current_ticket and self.current_ticket.is_complete() and self.pending_prize == 0:
-            pass  # Don't put it back in queue - it's done
-        elif self.current_ticket is not None:
-            # Current ticket not complete - put it back in the queue
-            self.ticket_queue.append(self.current_ticket)
-
-        # Remove the selected ticket from queue
-        if ticket in self.ticket_queue:
-            self.ticket_queue.remove(ticket)
-
-        # Make it current
-        self.current_ticket = ticket
-        self.pending_prize = 0
-        self.auto_collect_timer = 0
-        self.auto_collect_total_time = None
-
-        # If the newly-switched ticket is already complete, handle it
-        if self.current_ticket.is_complete():
-            self._handle_ticket_complete()
+    def _stash_ticket(self, ticket):
+        """Stash a ticket to the ticket inventory (shrink+fly)."""
+        self.mat.stash_ticket(ticket)
+        self.messages.add_message("Ticket stashed!", (180, 150, 220))
 
     def auto_scratch(self, dt):
         """Handle auto-scratching if upgrade is purchased."""
         speed = self.player.get_auto_scratch_speed()
-        if speed == 0 or self.current_ticket is None or self.current_ticket.is_complete():
+        target = self.mat.auto_scratch_target()
+        if speed == 0 or target is None:
             return
 
         self.auto_scratch_timer += dt
@@ -336,25 +281,32 @@ class Game:
         while self.auto_scratch_timer >= interval:
             self.auto_scratch_timer -= interval
 
-            ticket = self.current_ticket
-            x = ticket.x + random.randint(30, ticket.width - 30)
-            y = ticket.y + random.randint(50, ticket.height - 30)
+            # Re-check target each scratch (might have completed)
+            target = self.mat.auto_scratch_target()
+            if target is None:
+                break
 
-            self.handle_scratch((x, y))
+            x = target.x + random.randint(30, target.width - 30)
+            y = target.y + random.randint(50, target.height - 30)
+
+            self.handle_scratch((x, y), ticket=target)
 
     def auto_collect(self, dt):
-        """Handle auto-collecting if upgrade is purchased."""
-        if self.current_ticket is None or not self.current_ticket.is_complete():
-            return
-
+        """Handle auto-collecting: auto-redeem first completed winner on mat."""
         delay = self.player.get_auto_collect_delay()
         if delay is None:
+            return
+
+        winner = self.mat.get_first_complete_winner()
+        if winner is None:
+            self.auto_collect_timer = 0
             return
 
         self.auto_collect_timer += dt
 
         if self.auto_collect_timer >= delay:
-            self.collect_winnings()
+            self.auto_collect_timer = 0
+            self._redeem_ticket(winner)
     def check_for_lose_condition(self):
         if self.player.morale <= 0:
             self.game_lost = True
@@ -373,8 +325,8 @@ class Game:
         elif key == "inventory_screen":
             self.side_menus.setup_inventory(self.player)
         elif key == "ticket_inventory":
-            if self.current_ticket is not None or self.ticket_queue:
-                self.side_menus.setup_ticket_inventory(self.current_ticket, self.ticket_queue)
+            self.side_menus.setup_ticket_inventory(
+                self.mat.mat_tickets, self.mat.ticket_queue, self.mat.stashed_tickets)
 
     def _update_active_panel(self, mouse_pos, mouse_clicked):
         """Update the active side panel's content. Returns (key, result) or None."""
@@ -392,7 +344,8 @@ class Game:
             result = self.side_menus.update_inventory(mouse_pos, mouse_clicked, self.player)
         elif active == "ticket_inventory":
             result = self.side_menus.update_ticket_inventory(
-                mouse_pos, mouse_clicked, self.current_ticket, self.ticket_queue)
+                mouse_pos, mouse_clicked,
+                self.mat.mat_tickets, self.mat.ticket_queue, self.mat.stashed_tickets)
         if result is not None:
             return (active, result)
         return None
@@ -423,8 +376,11 @@ class Game:
                 self.messages.add_message(f"{value.title()} Consumed!")
                 self.side_menus.setup_inventory(self.player)
         elif key == "ticket_inventory":
-            self._switch_to_ticket(value)
+            # Stashed ticket pulled out — unstash and start dragging
+            self.mat.unstash_ticket(value, pygame.mouse.get_pos())
             self.side_menus.close_active()
+            self.side_menus.setup_ticket_inventory(
+                self.mat.mat_tickets, self.mat.ticket_queue, self.mat.stashed_tickets)
 
     def update(self, dt):
         """Update game state."""
@@ -433,6 +389,8 @@ class Game:
 
         # Detect click (mouse down this frame, wasn't down last frame)
         mouse_clicked = mouse_pressed and not self.mouse_was_pressed
+        # Detect release (was pressed last frame, not pressed now)
+        mouse_released = not mouse_pressed and self.mouse_was_pressed
 
         # Pee minigame takes over entirely
         if self.pee_minigame_active:
@@ -451,6 +409,9 @@ class Game:
                 self.player.save_game()
             self.mouse_was_pressed = mouse_pressed
             return
+
+        # === MAT ANIMATIONS (always run) ===
+        self.mat.update(dt)
 
         # === SIDE MENU SYSTEM (non-blocking) ===
 
@@ -474,25 +435,38 @@ class Game:
         mouse_in_menu = self.side_menus.is_point_in_menus(mouse_pos)
 
         if not mouse_in_menu:
-            # Handle scratching (continuous while mouse is held)
-            if mouse_pressed and self.current_ticket and not self.current_ticket.is_complete():
+            # --- DRAG SYSTEM ---
+            if mouse_clicked and not self.mat.is_dragging:
+                self.mat.start_drag(mouse_pos)
+
+            if mouse_pressed and self.mat.is_dragging:
+                self.mat.update_drag(mouse_pos)
+
+            if mouse_released and self.mat.is_dragging:
+                # Get the side panel rect for stash detection
+                side_panel_rect = None
+                if self.side_menus.active_panel_key == "ticket_inventory":
+                    panel = self.side_menus.panels["ticket_inventory"]
+                    if panel.is_open:
+                        side_panel_rect = panel.get_panel_rect()
+
+                drag_result = self.mat.end_drag(mouse_pos, side_panel_rect)
+                if drag_result:
+                    if drag_result["action"] == "redeem":
+                        self._redeem_ticket(drag_result["ticket"])
+                    elif drag_result["action"] == "stash":
+                        self._stash_ticket(drag_result["ticket"])
+
+            # --- SCRATCHING (only when NOT dragging) ---
+            if mouse_pressed and not self.mat.is_dragging:
                 self.handle_scratch(mouse_pos)
 
-            # COLLECT and PEE action buttons
+            # PEE action button
             if mouse_clicked:
-                if self.main_buttons.collect_btn.enabled:
-                    if self.main_buttons.collect_btn.update(mouse_pos, mouse_clicked):
-                        self.collect_winnings()
                 if self.main_buttons.pee_btn.enabled:
                     if self.main_buttons.pee_btn.update(mouse_pos, mouse_clicked):
                         self.pee_minigame.start(self.player)
                         self.pee_minigame_active = True
-
-        # Update collect button state (always)
-        if self.current_ticket and self.current_ticket.is_complete():
-            self.main_buttons.set_collect_enabled(True)
-        else:
-            self.main_buttons.set_collect_enabled(False)
 
         # Auto mechanics (always run)
         self.auto_scratch(dt)
@@ -567,73 +541,10 @@ class Game:
         shake_offset = self.screen_shake.get_offset()
         drunk_offset = self.drunk.get_offset()
 
-        final_offset = (
-            shake_offset[0] + drunk_offset[0],
-            shake_offset[1] + drunk_offset[1]
-        )
-
         self.screen.blit(self.background, (0, 0))
-        mat_x = self.mat_pos[0] + final_offset[0]
-        mat_y = self.mat_pos[1] + final_offset[1]
 
-        self.drunk.draw_double(self.screen, self.mat_surface, (mat_x, mat_y), "mat")
-
-        # Draw current ticket
-        if self.current_ticket:
-            tx = self.current_ticket.x
-            ty = self.current_ticket.y
-            # Check if drunk
-            if self.drunk.enabled:
-                ticket_offset = self.drunk.get_ticket_offset()
-                tx += final_offset[0] * 0.8 + ticket_offset[0]
-                ty += final_offset[1] * 0.8 + ticket_offset[1]
-
-            else:
-                tx += shake_offset[0]
-                ty += shake_offset[1]
-
-            # ----- COMPOSITE TICKET -----
-            ticket_surface = pygame.Surface(
-                (self.current_ticket.width, self.current_ticket.height),
-                pygame.SRCALPHA
-            )
-
-            # Draw base
-            ticket_surface.blit(self.current_ticket.base_surface, (0, 0))
-            # Draw scratch ON TOP
-            ticket_surface.blit(self.current_ticket.scratch_surface, (0, 0))
-
-            # Ghost entire ticket as ONE object
-            self.drunk.draw_double(self.screen, ticket_surface, (tx, ty), "ticket")
-
-            # Sharp border
-            pygame.draw.rect(
-                self.screen,
-                (80, 60, 40),
-                (tx - 2, ty - 2, self.current_ticket.width + 4, self.current_ticket.height + 4),
-                4,
-                border_radius=12
-            )
-
-            # Show queue count
-            if self.ticket_queue:
-                font = pygame.font.Font(None, 24)
-                queue_text = font.render(f"+{len(self.ticket_queue)} more tickets", True, (180, 180, 180))
-                self.screen.blit(queue_text, (
-                    self.current_ticket.x + self.current_ticket.width // 2 - queue_text.get_width() // 2,
-                    self.current_ticket.y + self.current_ticket.height + 15
-                ))
-
-            # Show auto-collect timer if applicable
-            if self.current_ticket.is_complete() and self.auto_collect_total_time is not None:
-                time_remaining = max(0, self.auto_collect_total_time - self.auto_collect_timer)
-                self.auto_collect_timer_ui.draw(
-                    self.screen,
-                    self.current_ticket.x + self.current_ticket.width // 2,
-                    self.current_ticket.y + self.current_ticket.height + 40,
-                    time_remaining,
-                    self.auto_collect_total_time
-                )
+        # Draw ticket mat (mat background + tickets + redeem box)
+        self.mat.draw(self.screen, shake_offset, drunk_offset, self.drunk)
 
         # Draw HUD
         self.hud.draw(self.screen, self.player)
@@ -648,9 +559,7 @@ class Game:
         self.screen.blit(lvl_text, (255, 115))
         # Draw Pee Bar
         self.pee_bar.draw(self.screen)
-        # Draw action buttons only (COLLECT + PEE)
-        if self.main_buttons.collect_btn.enabled:
-            self.main_buttons.collect_btn.draw(self.screen)
+        # Draw PEE button only (COLLECT phased out)
         if self.main_buttons.pee_btn.enabled:
             self.main_buttons.pee_btn.draw(self.screen)
 
@@ -684,10 +593,29 @@ class Game:
                     # Side menu scroll
                     self.side_menus.handle_scroll(event.y, pygame.mouse.get_pos())
 
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    # Handle drag release via event (backup — also handled in update)
+                    if self.mat.is_dragging:
+                        side_panel_rect = None
+                        if self.side_menus.active_panel_key == "ticket_inventory":
+                            panel = self.side_menus.panels["ticket_inventory"]
+                            if panel.is_open:
+                                side_panel_rect = panel.get_panel_rect()
+
+                        drag_result = self.mat.end_drag(pygame.mouse.get_pos(), side_panel_rect)
+                        if drag_result:
+                            if drag_result["action"] == "redeem":
+                                self._redeem_ticket(drag_result["ticket"])
+                            elif drag_result["action"] == "stash":
+                                self._stash_ticket(drag_result["ticket"])
+
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
-                        # Cancel pee minigame first
-                        if self.pee_minigame_active:
+                        # Cancel drag first
+                        if self.mat.is_dragging:
+                            self.mat.cancel_drag()
+                        # Cancel pee minigame
+                        elif self.pee_minigame_active:
                             self.pee_minigame.cancel()
                             self.pee_minigame_active = False
                         # Close side menu panel
@@ -698,9 +626,7 @@ class Game:
                     elif event.key == pygame.K_r:
                         # Reset game (debug)
                         self.player.reset_game()
-                        self.current_ticket = None
-                        self.ticket_queue = []
-                        self.pending_prize = 0
+                        self.mat = TicketMatManager()
                         self.auto_collect_timer = 0
                         self.ticket_shop.setup_buttons(TICKET_TYPES, self.player.get_unlocked_tickets())
                         self.upgrade_shop.setup_buttons(UPGRADES, self.player)

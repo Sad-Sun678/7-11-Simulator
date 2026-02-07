@@ -2,11 +2,15 @@ import pygame
 import random
 import math
 
-coin_img = pygame.image.load("assets/particles/coin.png")
-dollar_img = pygame.image.load("assets/particles/dollar.png")
-gem_img = pygame.image.load("assets/particles/gem.png")
+MONEY_SPRITES = None
 
-MONEY_SPRITES = [coin_img, dollar_img,gem_img]
+def _load_money_sprites():
+    global MONEY_SPRITES
+    if MONEY_SPRITES is None:
+        coin_img = pygame.image.load("assets/particles/coin.png")
+        dollar_img = pygame.image.load("assets/particles/dollar.png")
+        gem_img = pygame.image.load("assets/particles/gem.png")
+        MONEY_SPRITES = [coin_img, dollar_img, gem_img]
 
 class Particle:
     def __init__(
@@ -75,6 +79,7 @@ class Particle:
 
 class ParticleSystem:
     def __init__(self):
+        _load_money_sprites()
         self.particles = []
 
     def add_scratch_particles(self, x, y, color, count=5):
@@ -217,3 +222,4 @@ class ScreenShake:
     def get_offset(self):
         """Get the current shake offset."""
         return (int(self.offset_x), int(self.offset_y))
+

@@ -15,6 +15,11 @@ class ScratchTicket:
         self.height = height
         self.luck_bonus = luck_bonus
 
+        # Drag handle
+        self.handle_height = 28
+        self.dragging = False
+        self.drag_offset = (0, 0)
+
         # Generate the prize
         self.prize = self._generate_prize()
 
@@ -169,6 +174,15 @@ class ScratchTicket:
         """Get the prize amount."""
         return self.prize
 
+    def set_position(self, x, y):
+        """Move the ticket to a new position."""
+        self.x = x
+        self.y = y
+
+    def get_handle_rect(self):
+        """Return the grab-handle rectangle at the top of the ticket."""
+        return pygame.Rect(self.x, self.y, self.width, self.handle_height)
+
     def draw(self, screen):
         """Draw the ticket on the screen."""
         # Draw base (prize underneath)
@@ -181,6 +195,18 @@ class ScratchTicket:
         pygame.draw.rect(screen, (80, 60, 40),
                         (self.x - 2, self.y - 2, self.width + 4, self.height + 4),
                         4, border_radius=12)
+
+        # Draw drag handle strip at top
+        handle_rect = pygame.Rect(self.x, self.y, self.width, self.handle_height)
+        handle_surf = pygame.Surface((self.width, self.handle_height), pygame.SRCALPHA)
+        handle_surf.fill((0, 0, 0, 60))  # semi-transparent dark overlay
+        screen.blit(handle_surf, (self.x, self.y))
+        # Grip lines
+        for i in range(3):
+            ly = self.y + 9 + i * 6
+            pygame.draw.line(screen, (180, 180, 180),
+                             (self.x + self.width // 2 - 20, ly),
+                             (self.x + self.width // 2 + 20, ly), 1)
 
     def get_rect(self):
         """Get the ticket's bounding rectangle."""
@@ -209,6 +235,11 @@ class Match3Ticket:
         self.width = self.TICKET_WIDTH
         self.height = self.TICKET_HEIGHT
         self.luck_bonus = luck_bonus
+
+        # Drag handle
+        self.handle_height = 28
+        self.dragging = False
+        self.drag_offset = (0, 0)
 
         # Generate symbols for the 9 spots (3x3 grid)
         self.symbols = self._generate_symbols()
@@ -498,12 +529,32 @@ class Match3Ticket:
     def get_prize(self):
         return self.prize
 
+    def set_position(self, x, y):
+        """Move the ticket to a new position."""
+        self.x = x
+        self.y = y
+
+    def get_handle_rect(self):
+        """Return the grab-handle rectangle at the top of the ticket."""
+        return pygame.Rect(self.x, self.y, self.width, self.handle_height)
+
     def draw(self, screen):
         screen.blit(self.base_surface, (self.x, self.y))
         screen.blit(self.scratch_surface, (self.x, self.y))
         pygame.draw.rect(screen, (80, 60, 40),
                         (self.x - 2, self.y - 2, self.width + 4, self.height + 4),
                         4, border_radius=12)
+
+        # Draw drag handle strip at top
+        handle_surf = pygame.Surface((self.width, self.handle_height), pygame.SRCALPHA)
+        handle_surf.fill((0, 0, 0, 60))
+        screen.blit(handle_surf, (self.x, self.y))
+        # Grip lines
+        for i in range(3):
+            ly = self.y + 9 + i * 6
+            pygame.draw.line(screen, (180, 180, 180),
+                             (self.x + self.width // 2 - 20, ly),
+                             (self.x + self.width // 2 + 20, ly), 1)
 
         # Draw progress indicator (cells revealed)
         revealed = self.get_cells_revealed_count()

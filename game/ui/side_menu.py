@@ -570,44 +570,108 @@ class SideMenuManager:
                 used = key
         return used
 
-    # ---- TICKET INVENTORY ----
+    # ---- TICKET INVENTORY (3-section: On Mat / Queued / Stashed) ----
 
-    def setup_ticket_inventory(self, current_ticket, ticket_queue):
+    def setup_ticket_inventory(self, mat_tickets, ticket_queue, stashed_tickets):
+        """Build the ticket inventory panel with three sections."""
         panel = self.panels["ticket_inventory"]
         panel.buttons = []
         panel.desc_texts = {}
         btn_w = panel.panel_width - panel.BTN_PADDING_X * 2
 
-        all_tickets = []
-        if current_ticket is not None:
-            all_tickets.append((current_ticket, True))
-        for t in ticket_queue:
-            all_tickets.append((t, False))
+        idx = 0
 
-        for i, (ticket, is_current) in enumerate(all_tickets):
-            label = self._ticket_label(ticket, is_current)
-            color = self._ticket_button_color(ticket, is_current)
+        # --- Section: On Mat ---
+        if mat_tickets:
+            header_btn = Button(0, 0, btn_w, 30, "-- ON MAT --",
+                                color=(60, 60, 60), font_size=16)
+            header_btn.set_enabled(False)
+            header_btn.data_ref = None
+            header_btn._section_header = True
+            panel.buttons.append(header_btn)
+            idx += 1
 
-            btn = Button(0, 0, btn_w, 50, label,
-                         color=color, font_size=17)
-            btn.data_ref = ticket
-            if is_current:
-                btn.set_enabled(False)
-            panel.buttons.append(btn)
+            for ticket in mat_tickets:
+                label = self._ticket_label(ticket, is_current=False)
+                color = self._ticket_button_color(ticket, is_current=False)
+                btn = Button(0, 0, btn_w, 45, label,
+                             color=color, font_size=17)
+                btn.data_ref = ticket
+                btn.set_enabled(False)  # info only, not interactive
+                btn._section_header = False
+                panel.buttons.append(btn)
+                idx += 1
+
+        # --- Section: Queued ---
+        if ticket_queue:
+            header_btn = Button(0, 0, btn_w, 30, f"-- QUEUED ({len(ticket_queue)}) --",
+                                color=(60, 60, 60), font_size=16)
+            header_btn.set_enabled(False)
+            header_btn.data_ref = None
+            header_btn._section_header = True
+            panel.buttons.append(header_btn)
+            idx += 1
+
+            for ticket in ticket_queue:
+                label = self._ticket_label(ticket, is_current=False)
+                color = (80, 80, 80)
+                btn = Button(0, 0, btn_w, 45, label,
+                             color=color, font_size=17)
+                btn.data_ref = ticket
+                btn.set_enabled(False)  # info only
+                btn._section_header = False
+                panel.buttons.append(btn)
+                idx += 1
+
+        # --- Section: Stashed ---
+        if stashed_tickets:
+            header_btn = Button(0, 0, btn_w, 30, f"-- STASHED ({len(stashed_tickets)}) --",
+                                color=(60, 60, 60), font_size=16)
+            header_btn.set_enabled(False)
+            header_btn.data_ref = None
+            header_btn._section_header = True
+            panel.buttons.append(header_btn)
+            idx += 1
+
+            for ticket in stashed_tickets:
+                label = self._ticket_label(ticket, is_current=False) + "  [PULL OUT]"
+                color = (80, 60, 100)
+                btn = Button(0, 0, btn_w, 45, label,
+                             color=color, hover_color=(110, 80, 140), font_size=17)
+                btn.data_ref = ticket
+                btn.set_enabled(True)  # clickable — pull out
+                btn._section_header = False
+                btn._is_stashed = True
+                panel.buttons.append(btn)
+                idx += 1
+
+        # Empty state
+        if not panel.buttons:
+            empty_btn = Button(0, 0, btn_w, 45, "No tickets yet",
+                               color=(60, 60, 60), font_size=20)
+            empty_btn.set_enabled(False)
+            empty_btn.data_ref = None
+            empty_btn._section_header = True
+            panel.buttons.append(empty_btn)
 
         panel.content_height = len(panel.buttons) * panel.BTN_SPACING
         panel._recalc_scroll()
 
     def update_ticket_inventory(self, mouse_pos, mouse_clicked,
-                                current_ticket, ticket_queue):
+                                mat_tickets, ticket_queue, stashed_tickets):
+        """Update ticket inventory panel. Returns stashed ticket to unstash, or None."""
         panel = self.panels["ticket_inventory"]
         if not panel.is_open or panel.is_animating:
             return None
 
         clicked = None
         for btn in panel.buttons:
+            if getattr(btn, '_section_header', False):
+                continue
             if btn.update(mouse_pos, mouse_clicked):
-                clicked = btn.data_ref
+                # Only stashed tickets are interactive
+                if getattr(btn, '_is_stashed', False):
+                    clicked = btn.data_ref
         return clicked
 
     # ---- helpers ----

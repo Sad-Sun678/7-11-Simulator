@@ -14,7 +14,6 @@ class MessagePopup:
             "alpha": 255,
             "flag": flag
         })
-
     def update(self, dt):
         for msg in self.messages[:]:
             msg["timer"] -= dt

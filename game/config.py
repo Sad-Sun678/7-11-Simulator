@@ -21,16 +21,21 @@ SYMBOLS = {
     "star": {"color": (255, 255, 100), "value": 200, "shape": "star"},
 }
 
-SYMBOL_IMAGES = {
-    "cherry": pygame.image.load("assets/symbols/cherry.png"),
-    "lemon": pygame.image.load("assets/symbols/lemon.png"),
-    "grape": pygame.image.load("assets/symbols/grape.png"),
-    "bell": pygame.image.load("assets/symbols/bell.png"),
-    "seven": pygame.image.load("assets/symbols/seven.png"),
-    "diamond": pygame.image.load("assets/symbols/diamond.png"),
-    "star": pygame.image.load("assets/symbols/star.png"),
-    "orange": pygame.image.load("assets/symbols/orange.png")
-}
+SYMBOL_IMAGES = {}
+
+def load_symbol_images():
+    if SYMBOL_IMAGES:
+        return
+    SYMBOL_IMAGES.update({
+        "cherry": pygame.image.load("assets/symbols/cherry.png"),
+        "lemon": pygame.image.load("assets/symbols/lemon.png"),
+        "grape": pygame.image.load("assets/symbols/grape.png"),
+        "bell": pygame.image.load("assets/symbols/bell.png"),
+        "seven": pygame.image.load("assets/symbols/seven.png"),
+        "diamond": pygame.image.load("assets/symbols/diamond.png"),
+        "star": pygame.image.load("assets/symbols/star.png"),
+        "orange": pygame.image.load("assets/symbols/orange.png"),
+    })
 
 # Ticket type definitions
 TICKET_TYPES = {
