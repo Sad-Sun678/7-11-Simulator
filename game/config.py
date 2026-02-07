@@ -38,10 +38,15 @@ def load_symbol_images():
     })
 
 # Custom ticket artwork — loaded once, keyed by filename
-# Each ticket type can specify "scratch_image" and/or "base_image" in its config
-# to use a custom PNG instead of the procedural solid-color surface.
-# PNGs go in assets/tickets/ and are scaled to the ticket's dimensions at load time.
+# Each ticket type can specify any of these image keys in its config:
+#   "scratch_image"  — full-ticket scratch cover PNG (replaces solid color fill)
+#   "base_image"     — full-ticket background PNG (replaces procedural chrome)
+#   "cell_icon_image" — small PNG drawn centered in each scratch cell (replaces "?" text)
+#   "cell_cover_image"— PNG used as the scratch cell box itself (replaces the drawn rect)
+# PNGs go in assets/tickets/ and are scaled at draw time.
 TICKET_IMAGES = {}
+
+_TICKET_IMAGE_KEYS = ("scratch_image", "base_image", "cell_icon_image", "cell_cover_image")
 
 def load_ticket_images():
     """Load all unique ticket artwork PNGs referenced by TICKET_TYPES.
@@ -52,7 +57,7 @@ def load_ticket_images():
     # Gather every unique filename referenced by any ticket type
     needed = set()
     for cfg in TICKET_TYPES.values():
-        for key in ("scratch_image", "base_image"):
+        for key in _TICKET_IMAGE_KEYS:
             fname = cfg.get(key)
             if fname:
                 needed.add(fname)
@@ -99,9 +104,16 @@ TICKET_TYPES = {
         "symbols": ["cherry", "lemon", "orange", "grape", "bell"],  # Available symbols
         "unlock_threshold": 25,
         "ticket_class": "match3",
+        "layout": {
+            "ticket_width": 340,
+            "ticket_height": 400,
+            "cell_size": 40,  # bigger cells
+            "grid_x": 100,  # pin grid 30px from left
+            "grid_y": 225,  # pin grid 120px from top
+        },
     },
-    "lucky7": {
-        "name": "Lucky 7s",
+    "lady_luck": {
+        "name": "Lady Luck",
         "cost": 5,
         "color": (180, 100, 180),  # Purple
         "scratch_color": (200, 180, 200),
@@ -109,14 +121,26 @@ TICKET_TYPES = {
         "unlock_threshold": 50,
         "ticket_class": "standard",
     },
-    "match3_deluxe": {
-        "name": "Match 3 Deluxe",
+    "gold_rush": {
+        "name": "Gold Rush",
         "cost": 8,
         "color": (100, 180, 200),  # Teal
         "scratch_color": (180, 210, 220),
+        "scratch_image":"gold_rush.png",
+        "base_image":"gold_rush_bg.png",
+        "cell_cover_image": "gold_rush_cover.png",  # custom tile box
+        "cell_icon_image": "gold_rush_symbol.png",  # replaces the "?"
         "symbols": ["orange", "grape", "bell", "seven", "diamond"],  # Better symbols
         "unlock_threshold": 150,
         "ticket_class": "match3",
+        "layout": {
+            "ticket_width": 600,
+            "ticket_height": 300,
+            "cell_size": 64,  # bigger cells
+            "grid_x": 350,  # pin grid 30px from left
+            "grid_y": 40,  # pin grid 120px from top
+        },
+
     },
     "bigmoney": {
         "name": "Big Money",
@@ -145,15 +169,35 @@ TICKET_TYPES = {
         "unlock_threshold": 1000,
         "ticket_class": "standard",
     },
-    "number_match": {
-        "name": "Number Match",
+    "lucky_sevens": {
+        "name": "Lucky Sevens",
         "cost": 12,
-        "color": (80, 140, 200),  # Steel blue
+        "color": (80, 140, 200),
         "scratch_color": (190, 200, 220),
+        "scratch_image": "lucky_seven.png",
+        "base_image": "lucky_seven_bg.png",
+        "cell_cover_image": "lucky_seven_cover.png",
+        "cell_icon_image": "lucky_seven_symbol.png",
         "cell_prizes": [1, 2, 5, 5, 10, 10, 15, 20, 25, 50],
         "multipliers": [1, 1, 1, 1, 1, 2, 2, 3, 5],
         "unlock_threshold": 300,
         "ticket_class": "number_match",
+        "layout": {
+            "ticket_width": 350,
+            "ticket_height": 500,
+            "win_row_x": 40,
+            "win_row_y": 150,
+            "win_cell_w": 50,
+            "win_cell_h": 40,
+            "grid_x": 70,
+            "grid_y": 165,
+            "cell_w": 40,
+            "cell_h": 40,
+            "multiplier_x": 260,
+            "multiplier_y": 375,
+            "multiplier_w": 60,
+            "multiplier_h": 45,
+        },
     },
     "number_match_gold": {
         "name": "Gold Rush",
@@ -273,7 +317,7 @@ LEVEL_CONFIG = {
 # Pee minigame configuration
 PEE_CONFIG = {
     "max_bladder": 100,
-    "bladder_fill_rate": 5,       # per second (full in ~50s)
+    "bladder_fill_rate": 0,       # per second (full in ~50s)
     "pee_drain_rate": 15.0,         # bladder drain per second WHILE hitting bowl
     "stream_radius": 8,             # visual pee stream radius
     "bowl_x": 920,                  # bowl center X (adjust to match your toilet_bg)
