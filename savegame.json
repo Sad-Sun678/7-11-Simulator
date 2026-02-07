@@ -1,8 +1,8 @@
 {
-  "money": 1141.0,
-  "total_earned": 1244.0,
-  "total_spent": 108.0,
-  "tickets_scratched": 7,
+  "money": 2546.0,
+  "total_earned": 2804.0,
+  "total_spent": 263.0,
+  "tickets_scratched": 33,
   "biggest_win": 1000,
   "upgrades": {
     "lucky_charm": 0,
@@ -15,10 +15,10 @@
     "lucky_charm3": 0
   },
   "items": {
-    "beer": 2,
-    "cigarette": 3
+    "beer": 0,
+    "cigarette": 0
   },
-  "player_level": 5,
-  "current_xp": 375.3759999999984,
-  "current_bladder": 29.090000000000018
+  "player_level": 8,
+  "current_xp": 1165.1520000000119,
+  "current_bladder": 100
 }

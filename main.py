@@ -8,7 +8,7 @@ from game.ticket import ScratchTicket, create_ticket
 from game.player import Player
 from game.ui import (HUD, MessagePopup, TicketShopPopup, UpgradeShopPopup,
                      MainMenuButtons, AutoCollectTimer, ItemShopPopup, InventoryPopup,
-                     StatBar, Cigarette, TicketInventoryPopup, PeeCam)
+                     StatBar, Cigarette, TicketInventoryPopup, PeeCam, SideMenuManager)
 from game.effects import DrunkEffect
 from game.particles import ParticleSystem, ScreenShake
 from game.pee_minigame import PeeMinigame
@@ -51,10 +51,11 @@ class Game:
 
         self.ticket_inventory = TicketInventoryPopup(SCREEN_WIDTH, SCREEN_HEIGHT)
 
-        # Main screen buttons
+        # Main screen buttons (COLLECT + PEE still used from here)
         self.main_buttons = MainMenuButtons(SCREEN_WIDTH, SCREEN_HEIGHT)
-        # move the cluster over
 
+        # Side menu system (non-blocking replacement for popup menus)
+        self.side_menus = SideMenuManager(SCREEN_WIDTH, SCREEN_HEIGHT)
 
         # HUD and messages
         self.hud = HUD(SCREEN_WIDTH, SCREEN_HEIGHT)
@@ -359,6 +360,72 @@ class Game:
             self.game_lost = True
         else:
             return
+    # ------ Side menu helpers ------
+
+    def _setup_side_panel(self, key):
+        """Populate the side panel that was just opened."""
+        if key == "ticket_shop":
+            self.side_menus.setup_ticket_shop(TICKET_TYPES, self.player.get_unlocked_tickets())
+        elif key == "upgrades":
+            self.side_menus.setup_upgrades(UPGRADES, self.player)
+        elif key == "item_shop":
+            self.side_menus.setup_item_shop(ITEMS, self.player)
+        elif key == "inventory_screen":
+            self.side_menus.setup_inventory(self.player)
+        elif key == "ticket_inventory":
+            if self.current_ticket is not None or self.ticket_queue:
+                self.side_menus.setup_ticket_inventory(self.current_ticket, self.ticket_queue)
+
+    def _update_active_panel(self, mouse_pos, mouse_clicked):
+        """Update the active side panel's content. Returns (key, result) or None."""
+        active = self.side_menus.active_panel_key
+        if active is None:
+            return None
+        result = None
+        if active == "ticket_shop":
+            result = self.side_menus.update_ticket_shop(mouse_pos, mouse_clicked, self.player, TICKET_TYPES)
+        elif active == "upgrades":
+            result = self.side_menus.update_upgrades(mouse_pos, mouse_clicked, self.player, UPGRADES)
+        elif active == "item_shop":
+            result = self.side_menus.update_item_shop(mouse_pos, mouse_clicked, self.player, ITEMS)
+        elif active == "inventory_screen":
+            result = self.side_menus.update_inventory(mouse_pos, mouse_clicked, self.player)
+        elif active == "ticket_inventory":
+            result = self.side_menus.update_ticket_inventory(
+                mouse_pos, mouse_clicked, self.current_ticket, self.ticket_queue)
+        if result is not None:
+            return (active, result)
+        return None
+
+    def _handle_panel_result(self, result):
+        """Apply the action from a side panel interaction."""
+        key, value = result
+        if key == "ticket_shop":
+            bulk = self.player.get_bulk_amount()
+            for _ in range(bulk):
+                if not self.buy_ticket(value):
+                    break
+            # Refresh panel
+            self.side_menus.setup_ticket_shop(TICKET_TYPES, self.player.get_unlocked_tickets())
+        elif key == "upgrades":
+            if self.player.buy_upgrade(value):
+                upgrade_name = UPGRADES[value]["name"]
+                self.messages.add_message(f"{upgrade_name} upgraded!", (150, 150, 255))
+                self.side_menus.setup_upgrades(UPGRADES, self.player)
+        elif key == "item_shop":
+            if self.player.buy_item(value):
+                item_name = ITEMS[value]['name']
+                self.messages.add_message(f"{item_name} purchased!", (150, 150, 255))
+                self.side_menus.setup_item_shop(ITEMS, self.player)
+        elif key == "inventory_screen":
+            if self.player.try_use_item(value):
+                self.player.consume_item(value)
+                self.messages.add_message(f"{value.title()} Consumed!")
+                self.side_menus.setup_inventory(self.player)
+        elif key == "ticket_inventory":
+            self._switch_to_ticket(value)
+            self.side_menus.close_active()
+
     def update(self, dt):
         """Update game state."""
         mouse_pos = pygame.mouse.get_pos()
@@ -385,88 +452,47 @@ class Game:
             self.mouse_was_pressed = mouse_pressed
             return
 
-        # Check if any popup is open
-        popup_open = self.ticket_shop.is_open or self.upgrade_shop.is_open
+        # === SIDE MENU SYSTEM (non-blocking) ===
 
-        # Handle popup menus first (they block other interactions)
-        if self.ticket_shop.is_open:
-            bought_ticket = self.ticket_shop.update(mouse_pos, mouse_clicked, self.player, TICKET_TYPES)
-            if bought_ticket:
-                bulk = self.player.get_bulk_amount()
-                for _ in range(bulk):
-                    if not self.buy_ticket(bought_ticket):
-                        break
+        # 1. Animate panels every frame
+        self.side_menus.animate_all(dt)
 
-        elif self.upgrade_shop.is_open:
-            bought_upgrade = self.upgrade_shop.update(mouse_pos, mouse_clicked, self.player, UPGRADES)
-            if bought_upgrade:
-                if self.player.buy_upgrade(bought_upgrade):
-                    upgrade_name = UPGRADES[bought_upgrade]["name"]
-                    self.messages.add_message(f"{upgrade_name} upgraded!", (150, 150, 255))
-                    self.upgrade_shop.setup_buttons(UPGRADES, self.player)
+        # 2. Check trigger clicks (toggle / swap panels)
+        triggered = self.side_menus.update_triggers(mouse_pos, mouse_clicked)
+        if triggered:
+            self._setup_side_panel(triggered)
 
-        elif self.item_shop.is_open:
-            bought_item = self.item_shop.update(mouse_pos,mouse_clicked,self.player, ITEMS)
-            if bought_item:
-                if self.player.buy_item(bought_item):
-                    item_name = ITEMS[bought_item]['name']
-                    self.messages.add_message(f"{item_name} purchased!",(150, 150, 255))
-                    self.item_shop.setup_buttons(ITEMS,self.player)
-        elif  self.inventory_screen.is_open:
-            used_item = self.inventory_screen.update(mouse_pos,mouse_clicked,self.player)
-            print(used_item)
+        # 3. Check close button on active panel
+        self.side_menus.update_close_button(mouse_pos, mouse_clicked)
 
-            if used_item:
-                if self.player.try_use_item(used_item):
-                    self.player.consume_item(used_item)
-                    self.messages.add_message(f"{used_item.title()} Consumed!")
+        # 4. Update the active panel's content and handle result
+        panel_result = self._update_active_panel(mouse_pos, mouse_clicked)
+        if panel_result:
+            self._handle_panel_result(panel_result)
 
-        elif self.ticket_inventory.is_open:
-            selected_ticket = self.ticket_inventory.update(
-                mouse_pos, mouse_clicked,
-                self.current_ticket, self.ticket_queue
-            )
-            if selected_ticket is not None:
-                self._switch_to_ticket(selected_ticket)
-                self.ticket_inventory.close()
+        # 5. Gate main game mouse input — don't scratch / click through menus
+        mouse_in_menu = self.side_menus.is_point_in_menus(mouse_pos)
 
-        else:
-            # No popup open - handle main game
-
+        if not mouse_in_menu:
             # Handle scratching (continuous while mouse is held)
             if mouse_pressed and self.current_ticket and not self.current_ticket.is_complete():
                 self.handle_scratch(mouse_pos)
 
-            # Handle main menu button clicks
-            button_clicks = self.main_buttons.update(mouse_pos, mouse_clicked)
+            # COLLECT and PEE action buttons
+            if mouse_clicked:
+                if self.main_buttons.collect_btn.enabled:
+                    if self.main_buttons.collect_btn.update(mouse_pos, mouse_clicked):
+                        self.collect_winnings()
+                if self.main_buttons.pee_btn.enabled:
+                    if self.main_buttons.pee_btn.update(mouse_pos, mouse_clicked):
+                        self.pee_minigame.start(self.player)
+                        self.pee_minigame_active = True
 
-            if button_clicks["ticket_shop"]:
-                self.ticket_shop.setup_buttons(TICKET_TYPES, self.player.get_unlocked_tickets())
-                self.ticket_shop.open()
-            elif button_clicks["upgrades"]:
-                self.upgrade_shop.setup_buttons(UPGRADES, self.player)
-                self.upgrade_shop.open()
-            elif button_clicks["item_shop"]:
-                self.item_shop.setup_buttons(ITEMS, self.player)
-                self.item_shop.open()
-            elif button_clicks["inventory_screen"]:
-                self.inventory_screen.setup_buttons(self.player)
-                self.inventory_screen.open()
-            elif button_clicks["ticket_inventory"]:
-                if self.current_ticket is not None or self.ticket_queue:
-                    self.ticket_inventory.setup_buttons(self.current_ticket, self.ticket_queue)
-                    self.ticket_inventory.open()
-            elif button_clicks["collect"]:
-                self.collect_winnings()
-            elif button_clicks["pee"]:
-                self.pee_minigame.start(self.player)
-                self.pee_minigame_active = True
-
-            # Update collect button state
-            if self.current_ticket and self.current_ticket.is_complete():
-                self.main_buttons.set_collect_enabled(True)
-            else:
-                self.main_buttons.set_collect_enabled(False)
+        # Update collect button state (always)
+        if self.current_ticket and self.current_ticket.is_complete():
+            self.main_buttons.set_collect_enabled(True)
+        else:
+            self.main_buttons.set_collect_enabled(False)
 
         # Auto mechanics (always run)
         self.auto_scratch(dt)
@@ -622,8 +648,11 @@ class Game:
         self.screen.blit(lvl_text, (255, 115))
         # Draw Pee Bar
         self.pee_bar.draw(self.screen)
-        # Draw main buttons
-        self.main_buttons.draw(self.screen)
+        # Draw action buttons only (COLLECT + PEE)
+        if self.main_buttons.collect_btn.enabled:
+            self.main_buttons.collect_btn.draw(self.screen)
+        if self.main_buttons.pee_btn.enabled:
+            self.main_buttons.pee_btn.draw(self.screen)
 
         # Draw particles
         self.particles.draw(self.screen)
@@ -638,12 +667,8 @@ class Game:
         if self.pee_accident_active or self.pee_cam.finished:
             self.pee_cam.draw(self.screen)
 
-        # Draw popup menus (on top of everything)
-        self.ticket_shop.draw(self.screen)
-        self.upgrade_shop.draw(self.screen)
-        self.item_shop.draw(self.screen)
-        self.inventory_screen.draw(self.screen)
-        self.ticket_inventory.draw(self.screen)
+        # Draw side menus (triggers + panels, on top of game)
+        self.side_menus.draw(self.screen)
 
         pygame.display.flip()
 
@@ -656,14 +681,8 @@ class Game:
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.MOUSEWHEEL:
-                    if self.upgrade_shop.is_in_scroll_area(pygame.mouse.get_pos()):
-                        self.upgrade_shop.handle_scroll(event.y)
-                    if self.ticket_shop.is_in_scroll_area(pygame.mouse.get_pos()):
-                        self.ticket_shop.handle_scroll(event.y)
-                    if self.item_shop.is_in_scroll_area(pygame.mouse.get_pos()):
-                        self.item_shop.handle_scroll(event.y)
-                    if self.ticket_inventory.is_in_scroll_area(pygame.mouse.get_pos()):
-                        self.ticket_inventory.handle_scroll(event.y)
+                    # Side menu scroll
+                    self.side_menus.handle_scroll(event.y, pygame.mouse.get_pos())
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
@@ -671,16 +690,9 @@ class Game:
                         if self.pee_minigame_active:
                             self.pee_minigame.cancel()
                             self.pee_minigame_active = False
-                        # Close popups first, then exit
-                        elif self.ticket_shop.is_open:
-                            self.ticket_shop.close()
-                        elif self.upgrade_shop.is_open:
-                            self.upgrade_shop.close()
-                        elif self.inventory_screen.is_open:
-                            self.inventory_screen.close()
-                        elif self.ticket_inventory.is_open:
-                            self.ticket_inventory.close()
-
+                        # Close side menu panel
+                        elif self.side_menus.active_panel_key:
+                            self.side_menus.close_active()
                         else:
                             self.running = False
                     elif event.key == pygame.K_r:

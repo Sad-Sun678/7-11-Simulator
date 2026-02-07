@@ -8,3 +8,4 @@ from game.ui.popups import (
     ItemShopPopup, InventoryPopup, TicketInventoryPopup
 )
 from game.ui.main_buttons import MainMenuButtons
+from game.ui.side_menu import SideMenuManager

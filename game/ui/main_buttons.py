@@ -54,7 +54,7 @@ class MainMenuButtons:
         )
 
         self.collect_btn = Button(
-            padding + btn_width + 115, btn_y - 70,
+            padding + btn_width + 185, btn_y - 70,
             150, btn_height-10,
             "COLLECT",
             color=(120, 160, 60), hover_color=(160, 200, 80),
