@@ -199,6 +199,40 @@ TICKET_TYPES = {
             "multiplier_h": 45,
         },
     },
+    "hot_streak": {
+        "name": "Hot Streak",
+        "cost": 15,
+        "color": (255, 0, 0),
+        "scratch_color": (255, 0, 0),
+        "scratch_image": "hot_streak.png",
+        "base_image": "hot_streak_bg.png",
+        "cell_cover_image": "hot_streak_cover.png",
+        "cell_icon_image": "hot_streak_symbol.png",
+        "cell_prizes": [1, 2, 5, 5, 10, 10, 15, 20, 25, 50],
+        "multipliers": [1, 1, 1, 1, 1, 2, 2, 3, 5],
+        "unlock_threshold": 300,
+        "ticket_class": "number_match",
+        "winning_count": 3,
+        "grid_rows":2,
+        "grid_cols":3,
+        "number_pool":20,
+        "layout": {
+            "ticket_width": 350,
+            "ticket_height": 500,
+            "win_row_x": 100,
+            "win_row_y": 230,
+            "win_cell_w": 50,
+            "win_cell_h": 50,
+            "grid_x": 50,
+            "grid_y": 260,
+            "cell_w": 80,
+            "cell_h": 80,
+            "multiplier_x": 280,
+            "multiplier_y": 460,
+            "multiplier_w": 60,
+            "multiplier_h": 50,
+        },
+    },
     "number_match_gold": {
         "name": "Gold Rush",
         "cost": 30,
@@ -209,6 +243,7 @@ TICKET_TYPES = {
         "unlock_threshold": 1500,
         "ticket_class": "number_match",
     },
+
 }
 
 # Upgrade definitions
@@ -317,7 +352,7 @@ LEVEL_CONFIG = {
 # Pee minigame configuration
 PEE_CONFIG = {
     "max_bladder": 100,
-    "bladder_fill_rate": 0,       # per second (full in ~50s)
+    "bladder_fill_rate": 5,       # per second (full in ~50s)
     "pee_drain_rate": 15.0,         # bladder drain per second WHILE hitting bowl
     "stream_radius": 8,             # visual pee stream radius
     "bowl_x": 920,                  # bowl center X (adjust to match your toilet_bg)

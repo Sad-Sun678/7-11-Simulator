@@ -643,8 +643,10 @@ class Match3Ticket:
 
 
 class NumberMatchTicket:
-    """A scratch ticket with 5 winning numbers at top, 4x5 grid of your numbers with prizes,
-    and a bonus multiplier box. Match any of your numbers to a winning number to win that prize."""
+    """A scratch ticket with N winning numbers at top, a variable grid of your numbers with prizes,
+    and a bonus multiplier box. Match any of your numbers to a winning number to win that prize.
+    Config keys: winning_count (default 5), grid_rows (default 4), grid_cols (default 5),
+    number_pool (default 30 — numbers drawn from 1..N)."""
 
     # Default layout — every value can be overridden per-ticket via config["layout"]
     TICKET_WIDTH = 380
@@ -693,10 +695,17 @@ class NumberMatchTicket:
         # None = auto-center (original behaviour).
         self._win_row_x = layout.get("win_row_x", None)    # left edge of winning-numbers row
         self._win_row_y = layout.get("win_row_y", None)     # vertical center of winning row
-        self._grid_x = layout.get("grid_x", None)           # left edge of the 5-col grid
-        self._grid_y = layout.get("grid_y", None)            # top edge of the 4-row grid
+        self._grid_x = layout.get("grid_x", None)           # left edge of grid
+        self._grid_y = layout.get("grid_y", None)            # top edge of grid
         self._mult_x = layout.get("multiplier_x", None)     # center-x of multiplier box
         self._mult_y = layout.get("multiplier_y", None)      # center-y of multiplier box
+
+        # ---- Variable grid dimensions (game logic, not layout) ----
+        self._win_count = self.config.get("winning_count", 5)
+        self._grid_rows = self.config.get("grid_rows", 4)
+        self._grid_cols = self.config.get("grid_cols", 5)
+        self._grid_total = self._grid_rows * self._grid_cols
+        self._number_pool = self.config.get("number_pool", 30)  # numbers drawn from 1..N
 
         # Drag handle
         self.handle_height = 28
@@ -705,17 +714,19 @@ class NumberMatchTicket:
 
         # Generate game data
         self.winning_numbers = self._generate_winning_numbers()
-        self.grid_numbers = self._generate_grid_numbers()   # 4 rows x 5 cols
-        self.grid_prizes = self._generate_grid_prizes()      # prize under each number
+        self.grid_numbers = self._generate_grid_numbers()
+        self.grid_prizes = self._generate_grid_prizes()
         self.multiplier = self._generate_multiplier()
 
         # Calculate total prize
         self.prize = self._calculate_prize()
 
-        # Cell tracking: 5 winning + 20 grid + 1 multiplier = 26 cells
-        self.num_cells = 26
+        # Cell tracking: win_count + grid_total + 1 multiplier
+        self.num_cells = self._win_count + self._grid_total + 1
         self.cells_revealed = [False] * self.num_cells
-        # Indices: 0-4 = winning numbers, 5-24 = grid (row-major), 25 = multiplier
+        # Indices: 0..(win_count-1) = winning numbers,
+        #          win_count..(win_count+grid_total-1) = grid (row-major),
+        #          last = multiplier
 
         # Calculate cell positions
         self._calculate_layout()
@@ -729,26 +740,26 @@ class NumberMatchTicket:
         self.revealed = False
 
     def _generate_winning_numbers(self):
-        """Generate 5 unique winning numbers (1-30)."""
-        return random.sample(range(1, 31), 5)
+        """Generate unique winning numbers from the number pool."""
+        return random.sample(range(1, self._number_pool + 1), self._win_count)
 
     def _generate_grid_numbers(self):
-        """Generate 4x5 grid of numbers. Luck bonus increases match chance."""
+        """Generate grid of numbers. Luck bonus increases match chance."""
         numbers = []
         match_chance = 0.15 + (self.luck_bonus * 0.03)  # 15% base per cell
 
-        for _ in range(20):
+        for _ in range(self._grid_total):
             if random.random() < match_chance:
                 # Force a match with one of the winning numbers
                 numbers.append(random.choice(self.winning_numbers))
             else:
-                numbers.append(random.randint(1, 30))
+                numbers.append(random.randint(1, self._number_pool))
         return numbers
 
     def _generate_grid_prizes(self):
-        """Generate a prize value for each of the 20 grid cells."""
+        """Generate a prize value for each grid cell."""
         prize_pool = self.config["cell_prizes"]
-        return [random.choice(prize_pool) for _ in range(20)]
+        return [random.choice(prize_pool) for _ in range(self._grid_total)]
 
     def _generate_multiplier(self):
         """Generate the bonus multiplier (1x, 2x, 3x, 5x)."""
@@ -770,18 +781,18 @@ class NumberMatchTicket:
         self.cell_centers = []
         self.cell_bounds = []
 
-        grid_total_w = 5 * self._cell_w + 4 * self._cell_pad
-        win_total_w = 5 * self._win_cell_w + 4 * self._win_cell_pad
+        grid_total_w = self._grid_cols * self._cell_w + (self._grid_cols - 1) * self._cell_pad
+        win_total_w = self._win_count * self._win_cell_w + (self._win_count - 1) * self._win_cell_pad
 
         # --- Auto-center X baselines ---
         auto_grid_x = (self.width - grid_total_w - self._mult_w - 8) // 2
         auto_win_x = (self.width - win_total_w) // 2
 
-        # --- Winning numbers row (5 cells, independent size) ---
+        # --- Winning numbers row (variable count, independent size) ---
         win_start_x = self._win_row_x if self._win_row_x is not None else auto_win_x
         win_row_cy = self._win_row_y if self._win_row_y is not None else (self._header_height + self._win_row_h // 2)
 
-        for col in range(5):
+        for col in range(self._win_count):
             cx = win_start_x + col * (self._win_cell_w + self._win_cell_pad) + self._win_cell_w // 2
             cy = win_row_cy
             self.cell_centers.append((cx, cy))
@@ -789,12 +800,12 @@ class NumberMatchTicket:
                 cx - self._win_cell_w // 2, cy - self._win_cell_h // 2,
                 self._win_cell_w, self._win_cell_h))
 
-        # --- Grid numbers (4 rows x 5 cols) ---
+        # --- Grid numbers (variable rows x cols) ---
         grid_start_x = self._grid_x if self._grid_x is not None else auto_grid_x
         grid_top = self._grid_y if self._grid_y is not None else (self._header_height + self._win_row_h + self._grid_top_margin)
 
-        for row in range(4):
-            for col in range(5):
+        for row in range(self._grid_rows):
+            for col in range(self._grid_cols):
                 cx = grid_start_x + col * (self._cell_w + self._cell_pad) + self._cell_w // 2
                 cy = grid_top + row * (self._cell_h + self._cell_pad) + self._cell_h // 2
                 self.cell_centers.append((cx, cy))
@@ -811,7 +822,7 @@ class NumberMatchTicket:
         if self._mult_y is not None:
             mult_cy = self._mult_y
         else:
-            mult_cy = grid_top + (4 * (self._cell_h + self._cell_pad)) // 2
+            mult_cy = grid_top + (self._grid_rows * (self._cell_h + self._cell_pad)) // 2
 
         self.cell_centers.append((mult_cx, mult_cy))
         self.cell_bounds.append(pygame.Rect(
@@ -849,10 +860,15 @@ class NumberMatchTicket:
 
         # --- Draw winning numbers section ---
         label_font = pygame.font.Font(None, 16)
+        last_win_idx = self._win_count - 1
+        first_grid_idx = self._win_count
+        first_row_end_idx = self._win_count + self._grid_cols - 1
+        last_grid_idx = self._win_count + self._grid_total - 1
+        mult_idx = self._win_count + self._grid_total  # last cell
 
         if not has_custom_base:
             win_bg = pygame.Rect(self.cell_bounds[0].x - 6, self._header_height - 2,
-                                 self.cell_bounds[4].right - self.cell_bounds[0].x + 12,
+                                 self.cell_bounds[last_win_idx].right - self.cell_bounds[0].x + 12,
                                  self._win_row_h + 4)
             pygame.draw.rect(self.base_surface, (255, 230, 180), win_bg, border_radius=8)
             pygame.draw.rect(self.base_surface, (200, 160, 80), win_bg, 2, border_radius=8)
@@ -863,7 +879,7 @@ class NumberMatchTicket:
 
         # Winning numbers text (always — dynamic game data)
         num_font = pygame.font.Font(None, 32)
-        for i in range(5):
+        for i in range(self._win_count):
             cx, cy = self.cell_centers[i]
             cell_rect = self.cell_bounds[i]
 
@@ -879,10 +895,10 @@ class NumberMatchTicket:
         # --- Draw grid section ---
         if not has_custom_base:
             grid_bg = pygame.Rect(
-                self.cell_bounds[5].x - 6,
-                self.cell_bounds[5].y - 6,
-                self.cell_bounds[9].right - self.cell_bounds[5].x + 12,
-                self.cell_bounds[24].bottom - self.cell_bounds[5].y + 12)
+                self.cell_bounds[first_grid_idx].x - 6,
+                self.cell_bounds[first_grid_idx].y - 6,
+                self.cell_bounds[first_row_end_idx].right - self.cell_bounds[first_grid_idx].x + 12,
+                self.cell_bounds[last_grid_idx].bottom - self.cell_bounds[first_grid_idx].y + 12)
             pygame.draw.rect(self.base_surface, (240, 240, 255), grid_bg, border_radius=8)
             pygame.draw.rect(self.base_surface, (150, 150, 200), grid_bg, 2, border_radius=8)
 
@@ -890,8 +906,8 @@ class NumberMatchTicket:
         num_font_sm = pygame.font.Font(None, 26)
         prize_font = pygame.font.Font(None, 18)
 
-        for i in range(20):
-            idx = i + 5
+        for i in range(self._grid_total):
+            idx = i + self._win_count
             cx, cy = self.cell_centers[idx]
             cell_rect = self.cell_bounds[idx]
             num = self.grid_numbers[i]
@@ -916,8 +932,8 @@ class NumberMatchTicket:
             self.base_surface.blit(ptxt, (cx - ptxt.get_width() // 2, cy + 8))
 
         # --- Draw multiplier box ---
-        mult_cx, mult_cy = self.cell_centers[25]
-        mult_rect = self.cell_bounds[25]
+        mult_cx, mult_cy = self.cell_centers[mult_idx]
+        mult_rect = self.cell_bounds[mult_idx]
 
         if not has_custom_base:
             pygame.draw.rect(self.base_surface, (255, 220, 100), mult_rect, border_radius=8)
